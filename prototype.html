@@ -570,21 +570,26 @@
             <!-- Matriz de días -->
             <div class="grid grid-cols-7 gap-1.5 text-center">
               ${days.map(d => {
-                let bg = 'bg-gray-50 text-gray-400 border border-transparent';
-                let icon = d.num;
+                let cellClasses = 'bg-gray-50 text-gray-400 border border-transparent';
+                let indicator = '';
+
                 if (d.type === 'done') {
-                  bg = 'bg-brand-sage text-white font-bold';
-                  icon = '✓';
+                  // Fondo suave con número legible + tilde pequeña en esquina superior derecha
+                  cellClasses = 'bg-brand-sage/20 text-brand-dark font-bold border border-brand-sage/40';
+                  indicator = '<span class="absolute top-0.5 right-1 text-[8px] text-brand-sage font-black leading-none">✓</span>';
                 } else if (d.type === 'shield') {
-                  bg = 'bg-amber-100 text-amber-900 font-bold border border-amber-300';
-                  icon = '🛡️';
+                  // Fondo ámbar con número visible + escudo pequeño
+                  cellClasses = 'bg-amber-100/70 text-amber-950 font-bold border border-amber-300';
+                  indicator = '<span class="absolute top-0.5 right-0.5 text-[8px] leading-none">🛡️</span>';
                 } else if (d.type === 'current') {
-                  bg = 'bg-white border-2 border-brand-terracotta text-brand-dark font-bold';
-                  icon = d.num;
+                  // Día actual destacado
+                  cellClasses = 'bg-white border-2 border-brand-terracotta text-brand-dark font-black';
                 }
+
                 return `
-                  <div class="h-8 rounded-xl flex items-center justify-center text-xs transition-all ${bg}">
-                    ${icon}
+                  <div class="h-9 rounded-xl flex items-center justify-center text-xs relative transition-all ${cellClasses}">
+                    <span>${d.num}</span>
+                    ${indicator}
                   </div>
                 `;
               }).join('')}
