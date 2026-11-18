@@ -4,9 +4,11 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
+  Platform,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { THEME } from '../theme/colors';
 import { useHabitStore } from '../store/habitStore';
 import { Habit } from '../types/habit';
@@ -22,7 +24,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 }) => {
   const { habits, logs, toggleDayCompletion } = useHabitStore();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
+  const formattedDate = now.toLocaleDateString('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
 
   const activeHabit = habits.find((h) => h.status === 'active');
   const maintenanceHabits = habits.filter((h) => h.status === 'maintenance');
@@ -42,8 +55,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* ENCABEZADO */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.dateText}>Hoy</Text>
+          <View style={styles.titleCol}>
+            <Text style={styles.dateText}>{capitalizedDate}</Text>
             <Text style={styles.headerTitle}>Mi Día</Text>
           </View>
           <TouchableOpacity style={styles.shieldSimBtn} onPress={onSimulateShield}>
@@ -195,16 +208,21 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: THEME.colors.cream,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 0,
   },
   container: {
-    padding: THEME.spacing.lg,
+    paddingHorizontal: THEME.spacing.lg,
+    paddingTop: THEME.spacing.sm,
     paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: THEME.spacing.md,
+  },
+  titleCol: {
+    flex: 1,
   },
   dateText: {
     fontSize: 12,

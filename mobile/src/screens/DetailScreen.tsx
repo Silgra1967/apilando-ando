@@ -4,9 +4,11 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
+  Platform,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { THEME } from '../theme/colors';
 import { Habit } from '../types/habit';
 import { useHabitStore } from '../store/habitStore';
@@ -19,14 +21,28 @@ interface DetailScreenProps {
 export const DetailScreen: React.FC<DetailScreenProps> = ({ habit, onBack }) => {
   const { logs } = useHabitStore();
 
-  // Generar 30 días para simulación de calendario
-  // Días 1..currentStreak completados con número legible
-  const days = Array.from({ length: 30 }, (_, i) => {
-    const dayNum = i + 1;
-    let type: 'done' | 'shield' | 'empty' = 'empty';
+  const now = new Date();
+  const currentDayNum = now.getDate();
+  const currentMonthName = now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  const capitalizedMonth = currentMonthName.charAt(0).toUpperCase() + currentMonthName.slice(1);
 
-    if (dayNum <= habit.currentStreak) {
+  // Cantidad de días del mes actual
+  const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+  // Generar días reales del mes
+  const days = Array.from({ length: daysInCurrentMonth }, (_, i) => {
+    const dayNum = i + 1;
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    const log = logs[`${habit.id}_${dateStr}`];
+
+    let type: 'done' | 'shield' | 'today' | 'empty' = 'empty';
+
+    if (log?.status === 'completed') {
       type = 'done';
+    } else if (log?.status === 'shielded') {
+      type = 'shield';
+    } else if (dayNum === currentDayNum) {
+      type = 'today';
     }
 
     return { num: dayNum, type };
@@ -78,7 +94,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ habit, onBack }) => 
         {/* CALENDARIO MENSUAL MINIMALISTA */}
         <View style={styles.calendarBox}>
           <View style={styles.calendarHeader}>
-            <Text style={styles.calendarTitle}>Noviembre 2026</Text>
+            <Text style={styles.calendarTitle}>{capitalizedMonth}</Text>
             <View style={styles.legendRow}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: THEME.colors.sage }]} />
@@ -103,15 +119,30 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ habit, onBack }) => 
           <View style={styles.daysGrid}>
             {days.map((d) => {
               const isDone = d.type === 'done';
+              const isShield = d.type === 'shield';
+              const isToday = d.type === 'today';
+
               return (
                 <View
                   key={d.num}
-                  style={[styles.dayCell, isDone && styles.dayCellDone]}
+                  style={[
+                    styles.dayCell,
+                    isDone && styles.dayCellDone,
+                    isShield && styles.dayCellShield,
+                    isToday && styles.dayCellToday,
+                  ]}
                 >
-                  <Text style={[styles.dayNumber, isDone && styles.dayNumberDone]}>
+                  <Text
+                    style={[
+                      styles.dayNumber,
+                      (isDone || isShield) && styles.dayNumberDone,
+                      isToday && styles.dayNumberToday,
+                    ]}
+                  >
                     {d.num}
                   </Text>
                   {isDone && <Text style={styles.cornerCheck}>✓</Text>}
+                  {isShield && <Text style={styles.cornerShield}>🛡️</Text>}
                 </View>
               );
             })}
@@ -146,9 +177,11 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: THEME.colors.cream,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 0,
   },
   container: {
-    padding: THEME.spacing.lg,
+    paddingHorizontal: THEME.spacing.lg,
+    paddingTop: THEME.spacing.sm,
     paddingBottom: 40,
   },
   topNav: {
@@ -289,6 +322,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.colors.sage,
   },
+  dayCellShield: {
+    backgroundColor: THEME.colors.shieldGoldLight,
+    borderWidth: 1,
+    borderColor: THEME.colors.shieldGold,
+  },
+  dayCellToday: {
+    backgroundColor: THEME.colors.white,
+    borderWidth: 2,
+    borderColor: THEME.colors.terracotta,
+  },
   dayNumber: {
     fontSize: 11,
     color: THEME.colors.muted,
@@ -298,6 +341,10 @@ const styles = StyleSheet.create({
     color: THEME.colors.dark,
     fontWeight: '900',
   },
+  dayNumberToday: {
+    color: THEME.colors.terracotta,
+    fontWeight: '900',
+  },
   cornerCheck: {
     position: 'absolute',
     top: 2,
@@ -305,6 +352,12 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '900',
     color: THEME.colors.sage,
+  },
+  cornerShield: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    fontSize: 8,
   },
   stickersBox: {
     backgroundColor: THEME.colors.lightGray,
