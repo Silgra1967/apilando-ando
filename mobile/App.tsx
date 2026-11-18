@@ -7,6 +7,7 @@ import { DetailScreen } from './src/screens/DetailScreen';
 import { ShieldModal } from './src/components/ShieldModal';
 import { Habit } from './src/types/habit';
 import { THEME } from './src/theme/colors';
+import { scheduleDailyReminder } from './src/services/notificationService';
 
 export default function App() {
   const { isLoaded, loadFromStorage, settings, habits, useShield, resetStreak } = useHabitStore();
@@ -17,6 +18,13 @@ export default function App() {
   useEffect(() => {
     loadFromStorage();
   }, []);
+
+  // Programar recordatorio diario una vez cargada la configuración
+  useEffect(() => {
+    if (isLoaded && settings.onboardingCompleted) {
+      scheduleDailyReminder(settings.reminderTime || '20:00');
+    }
+  }, [isLoaded, settings.onboardingCompleted, settings.reminderTime]);
 
   if (!isLoaded) {
     return (

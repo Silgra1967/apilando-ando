@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { THEME } from '../theme/colors';
 import { useHabitStore } from '../store/habitStore';
 import { Habit } from '../types/habit';
+import { sendInstantTestNotification } from '../services/notificationService';
 
 interface DashboardScreenProps {
   onOpenDetail: (habit: Habit) => void;
@@ -59,9 +60,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.dateText}>{capitalizedDate}</Text>
             <Text style={styles.headerTitle}>Mi Día</Text>
           </View>
-          <TouchableOpacity style={styles.shieldSimBtn} onPress={onSimulateShield}>
-            <Text style={styles.shieldSimBtnText}>Simular Escudo 🛡️</Text>
-          </TouchableOpacity>
+          <View style={styles.headerButtonsRow}>
+            <TouchableOpacity
+              style={styles.notifTestBtn}
+              onPress={sendInstantTestNotification}
+            >
+              <Text style={styles.notifTestBtnText}>🔔 Probar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.shieldSimBtn} onPress={onSimulateShield}>
+              <Text style={styles.shieldSimBtnText}>🛡️ Escudo</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* PROGRESO DIARIO */}
@@ -248,6 +257,24 @@ const styles = StyleSheet.create({
   shieldSimBtnText: {
     fontSize: 11,
     color: '#7D6608',
+    fontWeight: '700',
+  },
+  headerButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  notifTestBtn: {
+    backgroundColor: THEME.colors.sageLight,
+    borderWidth: 1,
+    borderColor: THEME.colors.sage,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: THEME.radius.sm,
+  },
+  notifTestBtnText: {
+    fontSize: 11,
+    color: THEME.colors.dark,
     fontWeight: '700',
   },
   progressBarBox: {
