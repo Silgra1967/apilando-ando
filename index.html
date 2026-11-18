@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apliando Ando — Prototipo Interactivo</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Confetti library para micro-celebraciones -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              sage: '#8FA89B',
+              terracotta: '#D97D64',
+              lavender: '#A89BB9',
+              sand: '#D6C7A1',
+              cream: '#FAF7F2',
+              dark: '#2D312E',
+              muted: '#6E746E'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #FAF7F2;
+      color: #2D312E;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    .fade-in {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="flex justify-center min-h-screen p-0 sm:p-4">
+
+  <!-- Mobile Frame Container -->
+  <div class="w-full max-w-md bg-white sm:rounded-3xl shadow-xl overflow-hidden flex flex-col min-h-screen sm:min-h-[840px] relative border border-[#EBE5DC]">
+    
+    <!-- Top Status Simulation -->
+    <div class="px-6 pt-3 pb-2 flex justify-between items-center text-xs text-brand-muted font-medium select-none bg-white">
+      <span>9:41</span>
+      <span class="flex items-center gap-1">
+        <span class="text-[10px] bg-brand-sage/20 text-brand-dark px-2 py-0.5 rounded-full font-semibold">Prototipo</span>
+        <span>100%</span>
+      </span>
+    </div>
+
+    <!-- MAIN VIEW AREA -->
+    <div id="appContainer" class="flex-1 flex flex-col p-6 overflow-y-auto">
+      <!-- Se inyecta dinámicamente con JS -->
+    </div>
+
+  </div>
+
+  <script>
+    // --- ESTADO LOCAL DEL PROTOTIPO ---
+    const state = {
+      currentView: 'onboarding-1', // onboarding-1..5 o 'dashboard'
+      onboarding: {
+        habitName: '',
+        color: '#8FA89B', // Salvia por defecto
+        anchorText: '',
+        reminderTime: '20:00',
+        revelationStep: 1
+      },
+      // Datos de simulación para el Dashboard
+      routine: {
+        anchorGeneral: 'Después del café mañanero',
+        graduatedAnchors: [
+          { id: '1', name: 'Caminar 20 minutos', streak: 287, color: '#8FA89B' }
+        ],
+        maintenanceHabits: [
+          { id: '2', name: 'Lectura atenta (10 min)', streak: 45, color: '#A89BB9', completedToday: true }
+        ],
+        activeHabit: {
+          id: '3',
+          name: 'Respiración consciente',
+          anchor: 'Con el mate de la tarde',
+          streak: 14,
+          shields: 2,
+          dayTarget: 21,
+          completedToday: false,
+          color: '#D97D64'
+        }
+      },
+      showShieldModal: false
+    };
+
+    const colors = [
+      { name: 'Salvia', hex: '#8FA89B' },
+      { name: 'Terracota', hex: '#D97D64' },
+      { name: 'Lavanda', hex: '#A89BB9' },
+      { name: 'Arena', hex: '#D6C7A1' }
+    ];
+
+    // --- RENDERIZADORES DE VISTAS ---
+
+    function render() {
+      const container = document.getElementById('appContainer');
+      container.innerHTML = '';
+
+      if (state.currentView.startsWith('onboarding-')) {
+        renderOnboarding(container);
+      } else if (state.currentView === 'dashboard') {
+        renderDashboard(container);
+      }
+    }
+
+    // --- FLUJO DE ONBOARDING ---
+
+    function renderOnboarding(container) {
+      const step = state.currentView;
+
+      if (step === 'onboarding-1') {
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col justify-between py-8 fade-in">
+            <div class="mt-12 text-center">
+              <span class="text-4xl mb-4 block">🌱</span>
+              <h1 class="text-2xl font-bold tracking-tight text-brand-dark mb-4">Apliando Ando</h1>
+              <p class="text-base text-brand-muted leading-relaxed px-4">
+                Los hábitos no se construyen de golpe.<br>
+                Se construyen de a uno, despacio, sin prisa.<br><br>
+                <strong class="text-brand-dark font-medium">Acá vas a empezar por el primero.</strong>
+              </p>
+            </div>
+            <button onclick="goToView('onboarding-2')" class="w-full bg-brand-dark text-white font-medium py-4 rounded-2xl shadow-sm hover:opacity-95 transition-all">
+              Empezar
+            </button>
+          </div>
+        `;
+      } else if (step === 'onboarding-2') {
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col justify-between py-4 fade-in">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-brand-muted">Paso 1 de 4</span>
+              <h2 class="text-2xl font-bold text-brand-dark mt-2 mb-2">¿Qué hábito querés empezar a construir?</h2>
+              <p class="text-sm text-brand-muted mb-6">Elegí una acción pequeña y posible de hacer todos los días.</p>
+
+              <input 
+                id="habitInput" 
+                type="text" 
+                placeholder="Ej. Leer 10 minutos, Tomar agua..." 
+                value="${state.onboarding.habitName}"
+                class="w-full px-4 py-3.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-sage text-base mb-4"
+                oninput="state.onboarding.habitName = this.value"
+              />
+
+              <!-- Sugerencias rápidas -->
+              <div class="flex flex-wrap gap-2 mb-6">
+                ${['Leer 10 min', 'Caminar 15 min', 'Beber agua al despertar', 'Meditar 5 min'].map(s => `
+                  <button onclick="selectSuggestion('${s}')" class="text-xs bg-gray-100 hover:bg-gray-200 text-brand-dark px-3 py-1.5 rounded-full transition-all">
+                    ${s}
+                  </button>
+                `).join('')}
+              </div>
+
+              <!-- Selector sutil de 4 tonos pastel (Opción B) -->
+              <label class="block text-xs font-bold text-brand-muted uppercase mb-3">Color identificatorio</label>
+              <div class="flex gap-3">
+                ${colors.map(c => `
+                  <button 
+                    onclick="selectColor('${c.hex}')" 
+                    class="w-10 h-10 rounded-full flex items-center justify-center transition-all ${state.onboarding.color === c.hex ? 'ring-2 ring-offset-2 ring-brand-dark scale-105' : 'opacity-70 hover:opacity-100'}"
+                    style="background-color: ${c.hex};"
+                  >
+                    ${state.onboarding.color === c.hex ? '✓' : ''}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <button 
+              onclick="saveStep2()" 
+              class="w-full bg-brand-dark text-white font-medium py-4 rounded-2xl shadow-sm hover:opacity-95 transition-all mt-6"
+            >
+              Este es
+            </button>
+          </div>
+        `;
+      } else if (step === 'onboarding-3') {
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col justify-between py-4 fade-in">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-brand-muted">Paso 2 de 4</span>
+              <h2 class="text-2xl font-bold text-brand-dark mt-2 mb-2">¿A qué momento de tu día lo podés enganchar?</h2>
+              <p class="text-sm text-brand-muted mb-6">Los hábitos nuevos se instalan mejor cuando los atás a algo que ya hacés en automático.</p>
+
+              <input 
+                id="anchorInput" 
+                type="text" 
+                placeholder="Ej. Después del café, al llegar a casa..." 
+                value="${state.onboarding.anchorText}"
+                class="w-full px-4 py-3.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-sage text-base mb-4"
+                oninput="state.onboarding.anchorText = this.value"
+              />
+
+              <!-- Sugerencias de ancla -->
+              <div class="flex flex-wrap gap-2 mb-6">
+                ${['Después del desayuno', 'Con el mate de la mañana', 'Antes de dormir', 'Al volver del trabajo'].map(a => `
+                  <button onclick="selectAnchor('${a}')" class="text-xs bg-gray-100 hover:bg-gray-200 text-brand-dark px-3 py-1.5 rounded-full transition-all">
+                    ${a}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-3">
+              <button onclick="goToView('onboarding-4')" class="w-full bg-brand-dark text-white font-medium py-4 rounded-2xl shadow-sm hover:opacity-95 transition-all">
+                Perfecto
+              </button>
+              <button onclick="skipAnchor()" class="w-full text-xs text-brand-muted hover:text-brand-dark py-2 font-medium">
+                Prefiero no anclar por ahora
+              </button>
+            </div>
+          </div>
+        `;
+      } else if (step === 'onboarding-4') {
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col justify-between py-4 fade-in">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-brand-muted">Paso 3 de 4</span>
+              <h2 class="text-2xl font-bold text-brand-dark mt-2 mb-2">¿A qué hora querés que te recordemos?</h2>
+              <p class="text-sm text-brand-muted mb-6">Una notificación simple para cerrar tu día con tranquilidad. Cero spam.</p>
+
+              <div class="flex items-center justify-center py-10">
+                <input 
+                  type="time" 
+                  value="${state.onboarding.reminderTime}" 
+                  onchange="state.onboarding.reminderTime = this.value"
+                  class="text-4xl font-bold text-brand-dark bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-brand-sage"
+                />
+              </div>
+            </div>
+
+            <button onclick="goToView('onboarding-5')" class="w-full bg-brand-dark text-white font-medium py-4 rounded-2xl shadow-sm hover:opacity-95 transition-all">
+              Listo
+            </button>
+          </div>
+        `;
+      } else if (step === 'onboarding-5') {
+        renderRevelationCards(container);
+      }
+    }
+
+    // Tarjetas secuenciales (Paso 5)
+    function renderRevelationCards(container) {
+      const cardIdx = state.onboarding.revelationStep;
+      const habitName = state.onboarding.habitName || 'tu hábito';
+
+      let content = '';
+
+      if (cardIdx === 1) {
+        content = `
+          <div class="flex-1 flex flex-col justify-between py-4 fade-in">
+            <div class="my-auto text-center px-4">
+              <span class="text-5xl mb-6 block">🌱</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-brand-sage">Regla 1 de 3</span>
+              <h2 class="text-2xl font-bold text-brand-dark mt-2 mb-4">Un hábito a la vez</h2>
+              <p class="text-base text-brand-muted leading-relaxed">
+                Esta app solo te deja tener <strong>un hábito activo a la vez</strong>. No es un límite: es para asegurar que <strong>${habitName}</strong> realmente se vuelva parte de tu vida antes de sumar otra cosa.
+              </p>
+            </div>
+            <button onclick="nextRevelation(2)" class="w-full bg-brand-dark text-white font-medium py-4 rounded-2xl shadow-sm hover:opacity-95 transition-all">
+              Entendido
+            </button>
+          </div>
+        `;
+      } else if (cardIdx === 2) {
+        content = `
+          <div class="flex-1 flex flex-col justify-between py-4 fade-in">
+            <div class="my-auto text-center px-4">
+              <span class="text-5xl mb-6 block">🛡️</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-brand-sage">Regla 2 de 3</span>
+              <h2 class="text-2xl font-bold text-brand-dark mt-2 mb-4">Tus escudos de protección</h2>
+              <p class="text-base text-brand-muted leading-relaxed">
+                Empezás con <strong>2 escudos</strong>. Si un día no podés, la racha no se rompe: al día siguiente decidís conscientemente si usar tu escudo. La constancia importa más que la perfección.
+              </p>
+            </div>
+            <button onclick="nextRevelation(3)" class="w-full bg-brand-dark text-white font-medium py-4 rounded-2xl shadow-sm hover:opacity-95 transition-all">
+              Siguiente
+            </button>
+          </div>
+        `;
+      } else if (cardIdx === 3) {
+        content = `
+          <div class="flex-1 flex flex-col justify-between py-4 fade-in">
+            <div class="my-auto text-center px-4">
+              <span class="text-5xl mb-6 block">📅</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-brand-sage">Regla 3 de 3</span>
+              <h2 class="text-2xl font-bold text-brand-dark mt-2 mb-4">La meta de 21 días</h2>
+              <p class="text-base text-brand-muted leading-relaxed">
+                Cuando llegues a los <strong>21 días cumplidos</strong> con ${habitName}, recién ahí abriremos la puerta para sumar tu siguiente hábito. Hasta entonces, este es tu único foco.
+              </p>
+            </div>
+            <button onclick="finishOnboarding()" class="w-full bg-brand-sage text-white font-bold py-4 rounded-2xl shadow-sm hover:opacity-95 transition-all">
+              ¡Empecemos!
+            </button>
+          </div>
+        `;
+      }
+
+      container.innerHTML = content;
+    }
+
+    // --- DASHBOARD: "MI DÍA" ---
+
+    function renderDashboard(container) {
+      const r = state.routine;
+      const active = r.activeHabit;
+      const maintenance = r.maintenanceHabits;
+      const graduated = r.graduatedAnchors;
+
+      container.innerHTML = `
+        <div class="flex-1 flex flex-col fade-in">
+          
+          <!-- Encabezado -->
+          <div class="flex justify-between items-start mb-6">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-brand-muted">Martes, 17 de noviembre</span>
+              <h1 class="text-xl font-bold text-brand-dark">Mi Día</h1>
+            </div>
+            <button onclick="toggleShieldModal()" title="Simular confirmación de escudo" class="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1.5 rounded-xl font-medium">
+              Simular Escudo 🛡️
+            </button>
+          </div>
+
+          <!-- Barra sutil de estado diario -->
+          <div class="bg-gray-100 rounded-2xl p-3 mb-6 flex items-center justify-between text-xs text-brand-muted font-medium">
+            <span>Progreso de hoy</span>
+            <span class="font-bold text-brand-dark">${(maintenance.filter(m => m.completedToday).length + (active.completedToday ? 1 : 0))} de ${maintenance.length + 1} completados</span>
+          </div>
+
+          <!-- Cadena de Rutina (Habit Stacking) -->
+          <div class="space-y-4">
+            
+            <!-- 1. Ancla Externa -->
+            <div class="flex items-center gap-3 px-2 py-1">
+              <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900">🌳 ANCLA</span>
+              <span class="text-xs font-medium text-brand-muted">${r.anchorGeneral}</span>
+            </div>
+
+            <div class="border-l-2 border-dashed border-gray-200 ml-5 pl-4 space-y-4">
+
+              <!-- 2. Ancla Graduada (6 meses) -->
+              ${graduated.map(g => `
+                <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm opacity-90">
+                  <div class="flex justify-between items-center text-xs">
+                    <span class="font-bold text-brand-sage uppercase text-[10px]">🌳 Hábito Graduado</span>
+                    <span class="text-brand-muted font-medium">✦ ${g.streak} días racha</span>
+                  </div>
+                  <div class="text-sm font-semibold text-brand-dark mt-1">${g.name}</div>
+                  <div class="text-[11px] text-brand-muted mt-0.5">Ya es parte natural de vos</div>
+                </div>
+              `).join('')}
+
+              <!-- 3. Hábito en Mantenimiento -->
+              ${maintenance.map(m => `
+                <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                  <div>
+                    <div class="text-[10px] font-bold text-brand-lavender uppercase tracking-wider">🌿 Mantenimiento</div>
+                    <div class="text-sm font-bold text-brand-dark mt-0.5">${m.name}</div>
+                    <div class="text-xs text-brand-muted flex items-center gap-1 mt-1">
+                      <span>🔥 ${m.streak} días</span>
+                    </div>
+                  </div>
+                  <button 
+                    onclick="toggleMaintenance('${m.id}')"
+                    class="w-10 h-10 rounded-2xl border flex items-center justify-center text-base transition-all ${m.completedToday ? 'bg-brand-sage text-white border-brand-sage' : 'border-gray-300 hover:border-brand-sage'}"
+                  >
+                    ${m.completedToday ? '✓' : ''}
+                  </button>
+                </div>
+              `).join('')}
+
+              <!-- 4. Hábito Activo (El protagonista) -->
+              <div class="bg-white border-2 border-brand-terracotta/40 rounded-3xl p-5 shadow-md relative overflow-hidden">
+                <div class="flex justify-between items-start mb-2">
+                  <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-brand-terracotta/15 text-brand-terracotta uppercase tracking-wider">
+                    🌱 En Construcción (Activo)
+                  </span>
+                  <!-- Escudos disponibles -->
+                  <div class="flex items-center gap-1 text-xs">
+                    <span title="Escudos disponibles" class="flex gap-0.5">
+                      ${'🛡️'.repeat(active.shields)}${'⚪'.repeat(3 - active.shields)}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="text-base font-bold text-brand-dark mb-0.5">${active.name}</div>
+                <div class="text-xs text-brand-muted mb-4">↳ ${active.anchor}</div>
+
+                <!-- Barra de camino al hito (21 días) -->
+                <div class="space-y-1 mb-4">
+                  <div class="flex justify-between text-[11px] font-medium text-brand-muted">
+                    <span>Día ${active.streak} de ${active.dayTarget}</span>
+                    <span>${Math.round((active.streak / active.dayTarget) * 100)}%</span>
+                  </div>
+                  <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                    <div class="bg-brand-terracotta h-full rounded-full transition-all duration-500" style="width: ${(active.streak / active.dayTarget) * 100}%"></div>
+                  </div>
+                </div>
+
+                <!-- Checkbox principal de tildado -->
+                <button 
+                  onclick="toggleActiveHabit()" 
+                  class="w-full py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${active.completedToday ? 'bg-brand-sage text-white' : 'bg-brand-dark text-white hover:opacity-95'}"
+                >
+                  ${active.completedToday ? '<span>✓ Cumplido por hoy</span>' : '<span>Marcar como hecho</span>'}
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- Mensaje al completar todo -->
+          ${(active.completedToday && maintenance.every(m => m.completedToday)) ? `
+            <div class="mt-6 p-4 rounded-2xl bg-brand-sage/15 text-center text-xs text-brand-dark font-medium fade-in">
+              ✨ Rutina completa por hoy. Gran constancia, buen descanso.
+            </div>
+          ` : ''}
+
+        </div>
+
+        <!-- MODAL DE CONFIRMACIÓN DE ESCUDO (Simulado) -->
+        ${state.showShieldModal ? `
+          <div class="absolute inset-0 bg-black/40 flex items-end justify-center z-50 fade-in">
+            <div class="bg-white w-full rounded-t-3xl p-6 shadow-2xl">
+              <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4"></div>
+              <div class="text-center mb-4">
+                <span class="text-4xl block mb-2">🛡️</span>
+                <h3 class="text-lg font-bold text-brand-dark">A veces la vida se interpone</h3>
+                <p class="text-xs text-brand-muted mt-1 px-4 leading-relaxed">
+                  Ayer no registraste <strong>${active.name}</strong>.<br>
+                  ¿Querés activar un escudo para cuidar tu racha de ${active.streak} días?
+                </p>
+              </div>
+
+              <div class="bg-gray-50 rounded-2xl p-3 text-xs text-brand-muted flex justify-between items-center mb-5">
+                <span>Escudos restantes si lo usás:</span>
+                <span class="font-bold text-brand-dark">${active.shields - 1} de 3</span>
+              </div>
+
+              <div class="flex flex-col gap-2">
+                <button onclick="confirmShield(true)" class="w-full bg-brand-dark text-white font-medium py-3.5 rounded-2xl text-sm">
+                  Sí, usar escudo 🛡️
+                </button>
+                <button onclick="confirmShield(false)" class="w-full text-xs text-brand-muted hover:text-brand-dark py-2 font-medium">
+                  No, empezar racha de nuevo
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // --- ACCIONES INTERACTIVAS ---
+
+    function goToView(viewName) {
+      state.currentView = viewName;
+      render();
+    }
+
+    function selectSuggestion(name) {
+      state.onboarding.habitName = name;
+      render();
+    }
+
+    function selectColor(hex) {
+      state.onboarding.color = hex;
+      render();
+    }
+
+    function saveStep2() {
+      if (!state.onboarding.habitName.trim()) {
+        state.onboarding.habitName = 'Caminar 15 min';
+      }
+      goToView('onboarding-3');
+    }
+
+    function selectAnchor(anchor) {
+      state.onboarding.anchorText = anchor;
+      render();
+    }
+
+    function skipAnchor() {
+      state.onboarding.anchorText = '';
+      goToView('onboarding-4');
+    }
+
+    function nextRevelation(nextStep) {
+      state.onboarding.revelationStep = nextStep;
+      render();
+    }
+
+    function finishOnboarding() {
+      // Inyectar datos al hábito activo del dashboard
+      state.routine.activeHabit.name = state.onboarding.habitName || 'Mi Hábito Activo';
+      state.routine.activeHabit.color = state.onboarding.color;
+      state.routine.activeHabit.anchor = state.onboarding.anchorText ? state.onboarding.anchorText : 'Mi rutina diaria';
+      state.currentView = 'dashboard';
+      render();
+    }
+
+    function toggleActiveHabit() {
+      const active = state.routine.activeHabit;
+      active.completedToday = !active.completedToday;
+      if (active.completedToday) {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.8 },
+          colors: ['#8FA89B', '#D97D64', '#D6C7A1']
+        });
+      }
+      render();
+    }
+
+    function toggleMaintenance(id) {
+      const m = state.routine.maintenanceHabits.find(item => item.id === id);
+      if (m) {
+        m.completedToday = !m.completedToday;
+        render();
+      }
+    }
+
+    function toggleShieldModal() {
+      state.showShieldModal = !state.showShieldModal;
+      render();
+    }
+
+    function confirmShield(useIt) {
+      if (useIt && state.routine.activeHabit.shields > 0) {
+        state.routine.activeHabit.shields -= 1;
+      } else if (!useIt) {
+        state.routine.activeHabit.streak = 1;
+      }
+      state.showShieldModal = false;
+      render();
+    }
+
+    // Inicializar
+    render();
+  </script>
+</body>
+</html>
