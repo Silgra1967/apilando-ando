@@ -17,12 +17,14 @@ interface DetailScreenProps {
   habit: Habit;
   onBack: () => void;
   onOpenAddHabit?: () => void;
+  onOpenStickers?: () => void;
 }
 
 export const DetailScreen: React.FC<DetailScreenProps> = ({
   habit,
   onBack,
   onOpenAddHabit,
+  onOpenStickers,
 }) => {
   const {
     logs,
@@ -163,10 +165,17 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
         </View>
 
         {/* ÁLBUM DE STICKERS / LOGROS */}
-        <View style={styles.stickersBox}>
+        <TouchableOpacity
+          style={styles.stickersBox}
+          activeOpacity={0.85}
+          onPress={onOpenStickers}
+        >
           <View style={styles.stickersHeader}>
-            <Text style={styles.stickersTitle}>Álbum de Logros</Text>
-            <Text style={styles.stickersCount}>{habit.stickersUnlocked.length} ganados</Text>
+            <View>
+              <Text style={styles.stickersTitle}>Álbum de Logros</Text>
+              <Text style={styles.stickersSub}>Tocá para ver todas las insignias disponibles ✨</Text>
+            </View>
+            <Text style={styles.stickersCount}>{habit.stickersUnlocked.length} ganados →</Text>
           </View>
 
           <View style={styles.stickersList}>
@@ -177,10 +186,10 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
             ))}
 
             <View style={styles.stickerLocked}>
-              <Text style={styles.stickerLockedText}>🔒 Próximo: 21 Días</Text>
+              <Text style={styles.stickerLockedText}>🔒 Ver colección</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* ACCIONES DEL CICLO DE VIDA */}
         <View style={styles.actionsBox}>
@@ -461,6 +470,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: THEME.colors.dark,
     textTransform: 'uppercase',
+  },
+  stickersSub: {
+    fontSize: 10,
+    color: THEME.colors.muted,
+    marginTop: 2,
+    fontWeight: '600',
   },
   stickersCount: {
     fontSize: 11,

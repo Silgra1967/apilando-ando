@@ -7,6 +7,7 @@ import { DetailScreen } from './src/screens/DetailScreen';
 import { ShieldModal } from './src/components/ShieldModal';
 import { AddHabitModal } from './src/components/AddHabitModal';
 import { ConsolidationModal } from './src/components/ConsolidationModal';
+import { StickersModal } from './src/components/StickersModal';
 import { Habit } from './src/types/habit';
 import { THEME } from './src/theme/colors';
 import { scheduleDailyReminder } from './src/services/notificationService';
@@ -28,6 +29,8 @@ export default function App() {
   const [addHabitModalVisible, setAddHabitModalVisible] = useState<boolean>(false);
   const [consolidationModalVisible, setConsolidationModalVisible] = useState<boolean>(false);
   const [habitToConsolidate, setHabitToConsolidate] = useState<Habit | null>(null);
+  const [stickersModalVisible, setStickersModalVisible] = useState<boolean>(false);
+  const [habitForStickers, setHabitForStickers] = useState<Habit | null>(null);
 
   useEffect(() => {
     loadFromStorage();
@@ -77,6 +80,10 @@ export default function App() {
             setHabitToConsolidate(habit);
             setConsolidationModalVisible(true);
           }}
+          onOpenStickers={() => {
+            setHabitForStickers(null);
+            setStickersModalVisible(true);
+          }}
         />
       ) : (
         selectedHabit && (
@@ -87,6 +94,10 @@ export default function App() {
               setCurrentScreen('dashboard');
             }}
             onOpenAddHabit={() => setAddHabitModalVisible(true)}
+            onOpenStickers={() => {
+              setHabitForStickers(selectedHabit);
+              setStickersModalVisible(true);
+            }}
           />
         )
       )}
@@ -113,6 +124,14 @@ export default function App() {
         onAddHabit={async (name, color, anchorText) => {
           await addNewActiveHabit(name, color, anchorText);
         }}
+      />
+
+      {/* Modal de Álbum de Logros y Stickers */}
+      <StickersModal
+        visible={stickersModalVisible}
+        onClose={() => setStickersModalVisible(false)}
+        habit={habitForStickers}
+        allHabits={habits}
       />
 
       {/* Modal interactivo de confirmación de escudo */}

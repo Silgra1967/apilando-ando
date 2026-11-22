@@ -19,6 +19,7 @@ interface DashboardScreenProps {
   onSimulateShield: () => void;
   onOpenAddHabit: () => void;
   onPromoteHabit: (habit: Habit) => void;
+  onOpenStickers: () => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
@@ -26,6 +27,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onSimulateShield,
   onOpenAddHabit,
   onPromoteHabit,
+  onOpenStickers,
 }) => {
   const { habits, logs, toggleDayCompletion } = useHabitStore();
 
@@ -65,11 +67,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.headerTitle}>Mi Día</Text>
           </View>
           <View style={styles.headerButtonsRow}>
+            <TouchableOpacity style={styles.stickersHeaderBtn} onPress={onOpenStickers}>
+              <Text style={styles.stickersHeaderBtnText}>🏆 Álbum</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.notifTestBtn}
               onPress={sendInstantTestNotification}
             >
-              <Text style={styles.notifTestBtnText}>🔔 Probar</Text>
+              <Text style={styles.notifTestBtnText}>🔔</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.shieldSimBtn} onPress={onSimulateShield}>
               <Text style={styles.shieldSimBtnText}>🛡️ Escudo</Text>
@@ -275,6 +280,19 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: THEME.colors.dark,
     marginTop: 2,
+  },
+  stickersHeaderBtn: {
+    backgroundColor: THEME.colors.sandLight,
+    borderWidth: 1,
+    borderColor: THEME.colors.sand,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: THEME.radius.sm,
+  },
+  stickersHeaderBtnText: {
+    fontSize: 11,
+    color: THEME.colors.dark,
+    fontWeight: '700',
   },
   shieldSimBtn: {
     backgroundColor: THEME.colors.shieldGoldLight,
