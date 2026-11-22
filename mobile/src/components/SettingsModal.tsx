@@ -25,7 +25,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onResetOnboarding,
 }) => {
-  const { settings, updateSettings, habits, resetAllData, setSimulatedStreak } = useHabitStore();
+  const {
+    settings,
+    updateSettings,
+    habits,
+    resetAllData,
+    setSimulatedStreak,
+    simulateFullHistoryEnvironment,
+  } = useHabitStore();
   const [reminderTime, setReminderTime] = useState(settings.reminderTime || '20:00');
   const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notificationsEnabled);
   const activeHabit = habits.find((h) => h.status === 'active');
@@ -183,6 +190,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <Text style={styles.simBtnText}>Día 20 (para hito 21d 🌿)</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* BOTÓN SIMULAR ENTORNO COMPLETO CON HISTORIAL */}
+                <TouchableOpacity
+                  style={styles.fullSimBtn}
+                  onPress={async () => {
+                    await simulateFullHistoryEnvironment();
+                    Alert.alert(
+                      '🌱 Rutina completa simulada',
+                      'Se generó una rutina con:\n• 1 Hábito Graduado a Ancla (180d)\n• 1 Hábito en Mantenimiento (45d)\n• 1 Hábito Activo (12d)\n• 1 Hábito Pausado (15d)\n\nPodés explorar su cadena en Mi Día y tocar cualquiera para ver su historial y calendario.'
+                    );
+                    onClose();
+                  }}
+                >
+                  <Text style={styles.fullSimBtnText}>
+                    ✨ Cargar ecosistema completo (Ancla + Mantenimiento + Activo)
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -369,6 +393,22 @@ const styles = StyleSheet.create({
   simBtnText: {
     fontSize: 11,
     fontWeight: '700',
+    color: THEME.colors.dark,
+    textAlign: 'center',
+  },
+  fullSimBtn: {
+    backgroundColor: THEME.colors.sageLight,
+    borderWidth: 1,
+    borderColor: THEME.colors.sage,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: THEME.radius.md,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  fullSimBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
     color: THEME.colors.dark,
     textAlign: 'center',
   },

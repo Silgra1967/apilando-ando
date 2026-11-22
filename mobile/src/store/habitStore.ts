@@ -28,6 +28,7 @@ interface HabitStore {
     missedDate: string;
   } | null>;
   setSimulatedStreak: (habitId: string, streak: number, shields?: number) => Promise<void>;
+  simulateFullHistoryEnvironment: () => Promise<void>;
 }
 
 const STORAGE_KEYS = {
@@ -489,5 +490,145 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     );
     set({ habits: updated });
     await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated));
+  },
+
+  simulateFullHistoryEnvironment: async () => {
+    const now = new Date();
+    const nowISO = now.toISOString();
+
+    // 1. Hábito Graduado a Ancla (Trofeo de racha 180 días)
+    const anchorHabit: Habit = {
+      id: 'sim_anchor_1',
+      name: 'Caminar 20 minutos',
+      color: '#8FA89B',
+      anchorText: 'Después del café mañanero',
+      status: 'anchor',
+      currentStreak: 180,
+      bestStreak: 180,
+      totalCompletedDays: 180,
+      shieldsAvailable: 3,
+      createdAt: new Date(Date.now() - 86400000 * 200).toISOString(),
+      promotedToMaintenanceAt: new Date(Date.now() - 86400000 * 180).toISOString(),
+      graduatedToAnchorAt: new Date(Date.now() - 86400000 * 30).toISOString(),
+      stickersUnlocked: [
+        '🌱 Primer Paso',
+        '🔥 Semana Firme',
+        '⚡ Ritmo Vivo',
+        '🌿 Hábito Consolidado',
+        '🌙 Mes Imparable',
+        '👑 Centenario Dorado',
+        '🌳 Ancla Eterna',
+      ],
+    };
+
+    // 2. Hábito en Mantenimiento (Consolidado, tildable diario, racha 45 días)
+    const maintenanceHabit: Habit = {
+      id: 'sim_maint_1',
+      name: 'Leer 10 minutos',
+      color: '#D6C7A1',
+      anchorText: '↳ Después de Caminar 20 minutos',
+      status: 'maintenance',
+      currentStreak: 45,
+      bestStreak: 45,
+      totalCompletedDays: 45,
+      shieldsAvailable: 2,
+      createdAt: new Date(Date.now() - 86400000 * 50).toISOString(),
+      promotedToMaintenanceAt: new Date(Date.now() - 86400000 * 24).toISOString(),
+      stickersUnlocked: [
+        '🌱 Primer Paso',
+        '🔥 Semana Firme',
+        '⚡ Ritmo Vivo',
+        '🌿 Hábito Consolidado',
+        '🌙 Mes Imparable',
+      ],
+    };
+
+    // 3. Hábito Activo en Construcción (Día 12 de 21)
+    const activeHabit: Habit = {
+      id: 'sim_active_1',
+      name: 'Meditar 5 minutos',
+      color: '#A89BB9',
+      anchorText: '↳ Después de Leer 10 minutos',
+      status: 'active',
+      currentStreak: 12,
+      bestStreak: 12,
+      totalCompletedDays: 12,
+      shieldsAvailable: 2,
+      createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
+      stickersUnlocked: ['🌱 Primer Paso', '🔥 Semana Firme'],
+    };
+
+    // 4. Hábito Pausado (por viaje o lesión)
+    const pausedHabit: Habit = {
+      id: 'sim_paused_1',
+      name: 'Entrenar fuerza en casa',
+      color: '#D97D64',
+      status: 'paused',
+      currentStreak: 15,
+      bestStreak: 15,
+      totalCompletedDays: 15,
+      shieldsAvailable: 1,
+      createdAt: new Date(Date.now() - 86400000 * 60).toISOString(),
+      pausedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+      stickersUnlocked: ['🌱 Primer Paso', '🔥 Semana Firme', '⚡ Ritmo Vivo'],
+    };
+
+    // 5. Generar historial de registros diarios del mes actual para el calendario
+    const simulatedLogs: Record<string, DailyLog> = {};
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const todayNum = now.getDate();
+
+    // Llenar días previos del mes para que los calendarios se vean vivos
+    for (let d = 1; d <= todayNum; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      
+      // Hábito ancla (casi todos completados)
+      simulatedLogs[`${anchorHabit.id}_${dateStr}`] = {
+        id: `${anchorHabit.id}_${dateStr}`,
+        habitId: anchorHabit.id,
+        date: dateStr,
+        status: 'completed',
+        loggedAt: nowISO,
+      };
+
+      // Hábito mantenimiento
+      if (d % 6 === 0) {
+        simulatedLogs[`${maintenanceHabit.id}_${dateStr}`] = {
+          id: `${maintenanceHabit.id}_${dateStr}`,
+          habitId: maintenanceHabit.id,
+          date: dateStr,
+          status: 'shielded',
+          loggedAt: nowISO,
+        };
+      } else if (d < todayNum) {
+        simulatedLogs[`${maintenanceHabit.id}_${dateStr}`] = {
+          id: `${maintenanceHabit.id}_${dateStr}`,
+          habitId: maintenanceHabit.id,
+          date: dateStr,
+          status: 'completed',
+          loggedAt: nowISO,
+        };
+      }
+
+      // Hábito activo (últimos 12 días)
+      if (d > todayNum - 12 && d < todayNum) {
+        simulatedLogs[`${activeHabit.id}_${dateStr}`] = {
+          id: `${activeHabit.id}_${dateStr}`,
+          habitId: activeHabit.id,
+          date: dateStr,
+          status: 'completed',
+          loggedAt: nowISO,
+        };
+      }
+    }
+
+    const allSimulatedHabits = [anchorHabit, maintenanceHabit, activeHabit, pausedHabit];
+
+    set({ habits: allSimulatedHabits, logs: simulatedLogs });
+    await Promise.all([
+      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(allSimulatedHabits)),
+      AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(simulatedLogs)),
+    ]);
   },
 }));
