@@ -17,11 +17,15 @@ import { sendInstantTestNotification } from '../services/notificationService';
 interface DashboardScreenProps {
   onOpenDetail: (habit: Habit) => void;
   onSimulateShield: () => void;
+  onOpenAddHabit: () => void;
+  onPromoteHabit: (habit: Habit) => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenDetail,
   onSimulateShield,
+  onOpenAddHabit,
+  onPromoteHabit,
 }) => {
   const { habits, logs, toggleDayCompletion } = useHabitStore();
 
@@ -162,7 +166,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <View style={styles.targetProgressBox}>
                   <View style={styles.progressRowText}>
                     <Text style={styles.progressSub}>
-                      Día {activeHabit.currentStreak} de 21 para consolidar
+                      {activeHabit.currentStreak >= 21
+                        ? '🎉 ¡21 días completados!'
+                        : `Día ${activeHabit.currentStreak} de 21 para consolidar`}
                     </Text>
                     <Text style={styles.progressSub}>
                       {Math.min(100, Math.round((activeHabit.currentStreak / 21) * 100))}%
@@ -183,6 +189,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   </View>
                 </View>
 
+                {/* Invitación a consolidar si ya llegó a 21 días */}
+                {activeHabit.currentStreak >= 21 && (
+                  <TouchableOpacity
+                    style={styles.readyConsolidateBanner}
+                    onPress={() => onPromoteHabit(activeHabit)}
+                  >
+                    <Text style={styles.readyConsolidateTitle}>🌿 Listo para consolidar</Text>
+                    <Text style={styles.readyConsolidateSub}>
+                      Tocá acá para pasar a Mantenimiento y habilitar tu próximo hábito.
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
                 {/* Botón principal de tildado */}
                 <TouchableOpacity
                   style={[
@@ -196,6 +215,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   </Text>
                 </TouchableOpacity>
               </View>
+            )}
+
+            {/* Si no hay hábito activo (todos consolidados/anclas), botón para sumar uno */}
+            {!activeHabit && (
+              <TouchableOpacity style={styles.addHabitCard} onPress={onOpenAddHabit}>
+                <Text style={styles.addHabitIcon}>🌱</Text>
+                <Text style={styles.addHabitTitle}>Elegir nuevo hábito en foco</Text>
+                <Text style={styles.addHabitSub}>
+                  Tus hábitos anteriores ya están en marcha. ¿Qué te gustaría construir ahora?
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -509,5 +539,50 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: THEME.colors.dark,
     textAlign: 'center',
+  },
+  readyConsolidateBanner: {
+    backgroundColor: THEME.colors.sageLight,
+    borderWidth: 1,
+    borderColor: THEME.colors.sage,
+    padding: 12,
+    borderRadius: THEME.radius.md,
+    marginBottom: 14,
+  },
+  readyConsolidateTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: THEME.colors.dark,
+  },
+  readyConsolidateSub: {
+    fontSize: 11,
+    color: THEME.colors.muted,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  addHabitCard: {
+    backgroundColor: THEME.colors.white,
+    borderWidth: 1.5,
+    borderColor: THEME.colors.sage,
+    borderStyle: 'dashed',
+    borderRadius: THEME.radius.lg,
+    padding: 24,
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  addHabitIcon: {
+    fontSize: 28,
+    marginBottom: 6,
+  },
+  addHabitTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: THEME.colors.dark,
+  },
+  addHabitSub: {
+    fontSize: 12,
+    color: THEME.colors.muted,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
   },
 });

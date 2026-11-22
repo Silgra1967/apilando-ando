@@ -5,15 +5,29 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { DetailScreen } from './src/screens/DetailScreen';
 import { ShieldModal } from './src/components/ShieldModal';
+import { AddHabitModal } from './src/components/AddHabitModal';
+import { ConsolidationModal } from './src/components/ConsolidationModal';
 import { Habit } from './src/types/habit';
 import { THEME } from './src/theme/colors';
 import { scheduleDailyReminder } from './src/services/notificationService';
 
 export default function App() {
-  const { isLoaded, loadFromStorage, settings, habits, useShield, resetStreak } = useHabitStore();
+  const {
+    isLoaded,
+    loadFromStorage,
+    settings,
+    habits,
+    useShield,
+    resetStreak,
+    promoteToMaintenance,
+    addNewActiveHabit,
+  } = useHabitStore();
   const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'detail'>('dashboard');
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
   const [shieldModalVisible, setShieldModalVisible] = useState<boolean>(false);
+  const [addHabitModalVisible, setAddHabitModalVisible] = useState<boolean>(false);
+  const [consolidationModalVisible, setConsolidationModalVisible] = useState<boolean>(false);
+  const [habitToConsolidate, setHabitToConsolidate] = useState<Habit | null>(null);
 
   useEffect(() => {
     loadFromStorage();
@@ -58,18 +72,48 @@ export default function App() {
             setCurrentScreen('detail');
           }}
           onSimulateShield={() => setShieldModalVisible(true)}
+          onOpenAddHabit={() => setAddHabitModalVisible(true)}
+          onPromoteHabit={(habit) => {
+            setHabitToConsolidate(habit);
+            setConsolidationModalVisible(true);
+          }}
         />
       ) : (
         selectedHabit && (
           <DetailScreen
-            habit={selectedHabit}
+            habit={habits.find((h) => h.id === selectedHabit.id) || selectedHabit}
             onBack={() => {
               setSelectedHabit(null);
               setCurrentScreen('dashboard');
             }}
+            onOpenAddHabit={() => setAddHabitModalVisible(true)}
           />
         )
       )}
+
+      {/* Modal de Consolidación por 21 Días */}
+      <ConsolidationModal
+        visible={consolidationModalVisible}
+        habit={habitToConsolidate}
+        onConfirmPromote={async () => {
+          if (habitToConsolidate) {
+            await promoteToMaintenance(habitToConsolidate.id);
+          }
+          setConsolidationModalVisible(false);
+          setAddHabitModalVisible(true);
+        }}
+        onKeepActive={() => setConsolidationModalVisible(false)}
+      />
+
+      {/* Modal para Sumar Nuevo Hábito Activo */}
+      <AddHabitModal
+        visible={addHabitModalVisible}
+        onClose={() => setAddHabitModalVisible(false)}
+        availableAnchors={habits.filter((h) => h.status === 'maintenance' || h.status === 'anchor')}
+        onAddHabit={async (name, color, anchorText) => {
+          await addNewActiveHabit(name, color, anchorText);
+        }}
+      />
 
       {/* Modal interactivo de confirmación de escudo */}
       <ShieldModal

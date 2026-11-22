@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Habit, DailyLog, AppSettings } from '../types/habit';
+import { Habit, DailyLog, AppSettings, HabitStatus } from '../types/habit';
 
 interface HabitStore {
   habits: Habit[];
@@ -11,9 +11,15 @@ interface HabitStore {
   // Acciones
   loadFromStorage: () => Promise<void>;
   createInitialHabit: (name: string, color: string, anchorText?: string, reminderTime?: string) => Promise<void>;
+  promoteToMaintenance: (habitId: string) => Promise<void>;
+  graduateToAnchor: (habitId: string) => Promise<void>;
+  addNewActiveHabit: (name: string, color: string, anchorText?: string) => Promise<void>;
   toggleDayCompletion: (habitId: string, dateStr: string) => Promise<void>;
   useShield: (habitId: string, dateStr: string) => Promise<void>;
   resetStreak: (habitId: string) => Promise<void>;
+  pauseHabit: (habitId: string) => Promise<void>;
+  resumeHabit: (habitId: string) => Promise<void>;
+  archiveHabit: (habitId: string) => Promise<void>;
 }
 
 const STORAGE_KEYS = {
@@ -194,6 +200,130 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
         return {
           ...h,
           currentStreak: 0,
+        };
+      }
+      return h;
+    });
+
+    set({ habits: updatedHabits });
+    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+  },
+
+  promoteToMaintenance: async (habitId) => {
+    const { habits } = get();
+    const updatedHabits = habits.map((h) => {
+      if (h.id === habitId) {
+        let newStickers = [...h.stickersUnlocked];
+        if (!newStickers.includes('🌿 Hábito Consolidado')) {
+          newStickers.push('🌿 Hábito Consolidado');
+        }
+        return {
+          ...h,
+          status: 'maintenance' as const,
+          promotedToMaintenanceAt: new Date().toISOString(),
+          stickersUnlocked: newStickers,
+        };
+      }
+      return h;
+    });
+
+    set({ habits: updatedHabits });
+    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+  },
+
+  graduateToAnchor: async (habitId) => {
+    const { habits } = get();
+    const updatedHabits = habits.map((h) => {
+      if (h.id === habitId) {
+        let newStickers = [...h.stickersUnlocked];
+        if (!newStickers.includes('🌳 Ancla de Vida')) {
+          newStickers.push('🌳 Ancla de Vida');
+        }
+        return {
+          ...h,
+          status: 'anchor' as const,
+          graduatedToAnchorAt: new Date().toISOString(),
+          stickersUnlocked: newStickers,
+        };
+      }
+      return h;
+    });
+
+    set({ habits: updatedHabits });
+    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+  },
+
+  addNewActiveHabit: async (name, color, anchorText) => {
+    const { habits } = get();
+    // Validar que no haya otro hábito activo actualmente (o si hay, asegurarse de que se maneje)
+    const newHabit: Habit = {
+      id: Date.now().toString(),
+      name: name.trim(),
+      color,
+      anchorText: anchorText?.trim() || undefined,
+      status: 'active',
+      currentStreak: 0,
+      bestStreak: 0,
+      totalCompletedDays: 0,
+      shieldsAvailable: 2,
+      createdAt: new Date().toISOString(),
+      stickersUnlocked: ['🌱 Nuevo Comienzo'],
+    };
+
+    const updatedHabits = [...habits, newHabit];
+    set({ habits: updatedHabits });
+    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+  },
+
+  pauseHabit: async (habitId) => {
+    const { habits } = get();
+    const updatedHabits = habits.map((h) => {
+      if (h.id === habitId) {
+        return {
+          ...h,
+          status: 'paused' as const,
+          pausedAt: new Date().toISOString(),
+        };
+      }
+      return h;
+    });
+
+    set({ habits: updatedHabits });
+    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+  },
+
+  resumeHabit: async (habitId) => {
+    const { habits } = get();
+    const target = habits.find((h) => h.id === habitId);
+    if (!target) return;
+
+    const hasActive = habits.some((h) => h.status === 'active' && h.id !== habitId);
+    // Si ya hay un activo, vuelve a mantenimiento si ya fue promovido antes, o activo si no hay ninguno activo
+    const nextStatus: HabitStatus = hasActive ? 'maintenance' : (target.promotedToMaintenanceAt ? 'maintenance' : 'active');
+
+    const updatedHabits = habits.map((h) => {
+      if (h.id === habitId) {
+        return {
+          ...h,
+          status: nextStatus,
+          pausedAt: undefined,
+        };
+      }
+      return h;
+    });
+
+    set({ habits: updatedHabits });
+    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+  },
+
+  archiveHabit: async (habitId) => {
+    const { habits } = get();
+    const updatedHabits = habits.map((h) => {
+      if (h.id === habitId) {
+        return {
+          ...h,
+          status: 'archived' as const,
+          archivedAt: new Date().toISOString(),
         };
       }
       return h;

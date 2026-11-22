@@ -16,10 +16,23 @@ import { useHabitStore } from '../store/habitStore';
 interface DetailScreenProps {
   habit: Habit;
   onBack: () => void;
+  onOpenAddHabit?: () => void;
 }
 
-export const DetailScreen: React.FC<DetailScreenProps> = ({ habit, onBack }) => {
-  const { logs } = useHabitStore();
+export const DetailScreen: React.FC<DetailScreenProps> = ({
+  habit,
+  onBack,
+  onOpenAddHabit,
+}) => {
+  const {
+    logs,
+    habits,
+    promoteToMaintenance,
+    graduateToAnchor,
+    pauseHabit,
+    resumeHabit,
+    archiveHabit,
+  } = useHabitStore();
 
   const now = new Date();
   const currentDayNum = now.getDate();
@@ -166,6 +179,79 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ habit, onBack }) => 
             <View style={styles.stickerLocked}>
               <Text style={styles.stickerLockedText}>🔒 Próximo: 21 Días</Text>
             </View>
+          </View>
+        </View>
+
+        {/* ACCIONES DEL CICLO DE VIDA */}
+        <View style={styles.actionsBox}>
+          <Text style={styles.actionsTitle}>Ciclo de vida del hábito</Text>
+
+          {habit.status === 'active' && habit.currentStreak >= 21 && (
+            <TouchableOpacity
+              style={styles.promoteBtn}
+              onPress={async () => {
+                await promoteToMaintenance(habit.id);
+                if (onOpenAddHabit) onOpenAddHabit();
+              }}
+            >
+              <Text style={styles.promoteBtnText}>🌿 Consolidar a Mantenimiento</Text>
+              <Text style={styles.promoteBtnSub}>
+                Cumpliste 21 días. Libera el espacio para un nuevo hábito activo.
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {habit.status === 'maintenance' && (
+            <TouchableOpacity
+              style={styles.graduateBtn}
+              onPress={async () => {
+                await graduateToAnchor(habit.id);
+                onBack();
+              }}
+            >
+              <Text style={styles.graduateBtnText}>🌳 Graduar a Ancla Definitiva</Text>
+              <Text style={styles.graduateBtnSub}>
+                Si ya es parte 100% natural de tu vida, deja de requerir tildado diario.
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.secondaryActionsRow}>
+            {habit.status === 'paused' ? (
+              <TouchableOpacity
+                style={styles.actionPill}
+                onPress={async () => {
+                  await resumeHabit(habit.id);
+                }}
+              >
+                <Text style={styles.actionPillText}>▶️ Reanudar hábito</Text>
+              </TouchableOpacity>
+            ) : (
+              habit.status !== 'archived' && (
+                <TouchableOpacity
+                  style={styles.actionPill}
+                  onPress={async () => {
+                    await pauseHabit(habit.id);
+                  }}
+                >
+                  <Text style={styles.actionPillText}>⏸️ Pausar temporalmente</Text>
+                </TouchableOpacity>
+              )
+            )}
+
+            {habit.status !== 'archived' && (
+              <TouchableOpacity
+                style={[styles.actionPill, styles.actionPillArchived]}
+                onPress={async () => {
+                  await archiveHabit(habit.id);
+                  onBack();
+                }}
+              >
+                <Text style={[styles.actionPillText, styles.actionPillTextArchived]}>
+                  📦 Archivar
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -411,5 +497,82 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: THEME.colors.muted,
     fontWeight: '600',
+  },
+  actionsBox: {
+    marginTop: THEME.spacing.lg,
+    backgroundColor: THEME.colors.white,
+    padding: 16,
+    borderRadius: THEME.radius.lg,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+  },
+  actionsTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: THEME.colors.dark,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
+  promoteBtn: {
+    backgroundColor: THEME.colors.sageLight,
+    borderWidth: 1,
+    borderColor: THEME.colors.sage,
+    padding: 14,
+    borderRadius: THEME.radius.md,
+    marginBottom: 12,
+  },
+  promoteBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: THEME.colors.dark,
+  },
+  promoteBtnSub: {
+    fontSize: 11,
+    color: THEME.colors.muted,
+    marginTop: 4,
+    lineHeight: 15,
+  },
+  graduateBtn: {
+    backgroundColor: THEME.colors.sandLight,
+    borderWidth: 1,
+    borderColor: THEME.colors.sand,
+    padding: 14,
+    borderRadius: THEME.radius.md,
+    marginBottom: 12,
+  },
+  graduateBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: THEME.colors.dark,
+  },
+  graduateBtnSub: {
+    fontSize: 11,
+    color: THEME.colors.muted,
+    marginTop: 4,
+    lineHeight: 15,
+  },
+  secondaryActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  actionPill: {
+    flex: 1,
+    backgroundColor: THEME.colors.lightGray,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: THEME.radius.md,
+    alignItems: 'center',
+  },
+  actionPillArchived: {
+    backgroundColor: '#FBEBEB',
+  },
+  actionPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.colors.dark,
+  },
+  actionPillTextArchived: {
+    color: '#C0392B',
   },
 });
