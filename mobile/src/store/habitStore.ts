@@ -20,6 +20,8 @@ interface HabitStore {
   pauseHabit: (habitId: string) => Promise<void>;
   resumeHabit: (habitId: string) => Promise<void>;
   archiveHabit: (habitId: string) => Promise<void>;
+  updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  resetAllData: () => Promise<void>;
 }
 
 const STORAGE_KEYS = {
@@ -331,5 +333,31 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
     set({ habits: updatedHabits });
     await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+  },
+
+  updateSettings: async (newSettings) => {
+    const { settings } = get();
+    const merged = { ...settings, ...newSettings };
+    set({ settings: merged });
+    await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(merged));
+  },
+
+  resetAllData: async () => {
+    await Promise.all([
+      AsyncStorage.removeItem(STORAGE_KEYS.HABITS),
+      AsyncStorage.removeItem(STORAGE_KEYS.LOGS),
+      AsyncStorage.removeItem(STORAGE_KEYS.SETTINGS),
+    ]);
+
+    set({
+      habits: [],
+      logs: {},
+      settings: {
+        reminderTime: '20:00',
+        notificationsEnabled: true,
+        soundEnabled: true,
+        onboardingCompleted: false,
+      },
+    });
   },
 }));

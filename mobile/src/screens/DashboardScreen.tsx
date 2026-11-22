@@ -20,6 +20,7 @@ interface DashboardScreenProps {
   onOpenAddHabit: () => void;
   onPromoteHabit: (habit: Habit) => void;
   onOpenStickers: () => void;
+  onOpenSettings: () => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
@@ -28,6 +29,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenAddHabit,
   onPromoteHabit,
   onOpenStickers,
+  onOpenSettings,
 }) => {
   const { habits, logs, toggleDayCompletion } = useHabitStore();
 
@@ -68,16 +70,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </View>
           <View style={styles.headerButtonsRow}>
             <TouchableOpacity style={styles.stickersHeaderBtn} onPress={onOpenStickers}>
-              <Text style={styles.stickersHeaderBtnText}>🏆 Álbum</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.notifTestBtn}
-              onPress={sendInstantTestNotification}
-            >
-              <Text style={styles.notifTestBtnText}>🔔</Text>
+              <Text style={styles.stickersHeaderBtnText}>🏆</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.shieldSimBtn} onPress={onSimulateShield}>
-              <Text style={styles.shieldSimBtnText}>🛡️ Escudo</Text>
+              <Text style={styles.shieldSimBtnText}>🛡️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingsHeaderBtn} onPress={onOpenSettings}>
+              <Text style={styles.settingsHeaderBtnText}>⚙️</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -306,6 +305,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#7D6608',
     fontWeight: '700',
+  },
+  settingsHeaderBtn: {
+    backgroundColor: THEME.colors.lightGray,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: THEME.radius.sm,
+  },
+  settingsHeaderBtnText: {
+    fontSize: 12,
   },
   headerButtonsRow: {
     flexDirection: 'row',
