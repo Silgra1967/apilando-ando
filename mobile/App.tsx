@@ -10,6 +10,10 @@ import { ConsolidationModal } from './src/components/ConsolidationModal';
 import { StickersModal } from './src/components/StickersModal';
 import { SettingsModal } from './src/components/SettingsModal';
 import { MonthlyReviewModal } from './src/components/MonthlyReviewModal';
+import {
+  MilestoneCelebrationModal,
+  MilestoneCelebrationData,
+} from './src/components/MilestoneCelebrationModal';
 import { Habit } from './src/types/habit';
 import { THEME } from './src/theme/colors';
 import { scheduleDailyReminder } from './src/services/notificationService';
@@ -24,6 +28,7 @@ export default function App() {
     resetStreak,
     promoteToMaintenance,
     addNewActiveHabit,
+    checkPendingShieldsAndExpiration,
   } = useHabitStore();
   const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'detail'>('dashboard');
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
@@ -35,15 +40,25 @@ export default function App() {
   const [habitForStickers, setHabitForStickers] = useState<Habit | null>(null);
   const [settingsModalVisible, setSettingsModalVisible] = useState<boolean>(false);
   const [monthlyReviewVisible, setMonthlyReviewVisible] = useState<boolean>(false);
+  const [milestoneCelebration, setMilestoneCelebration] = useState<MilestoneCelebrationData | null>(null);
+  const [pendingShieldDate, setPendingShieldDate] = useState<string | null>(null);
 
   useEffect(() => {
     loadFromStorage();
   }, []);
 
-  // Programar recordatorio diario una vez cargada la configuración
+  // Programar recordatorio diario y verificar escudos pendientes al abrir
   useEffect(() => {
     if (isLoaded && settings.onboardingCompleted) {
       scheduleDailyReminder(settings.reminderTime || '20:00');
+
+      // Comprobar automáticamente si ayer faltó tildar y hay escudos
+      checkPendingShieldsAndExpiration().then((pending) => {
+        if (pending) {
+          setPendingShieldDate(pending.missedDate);
+          setShieldModalVisible(true);
+        }
+      });
     }
   }, [isLoaded, settings.onboardingCompleted, settings.reminderTime]);
 
@@ -90,6 +105,7 @@ export default function App() {
           }}
           onOpenSettings={() => setSettingsModalVisible(true)}
           onOpenMonthlyReview={() => setMonthlyReviewVisible(true)}
+          onMilestoneReached={(celebration) => setMilestoneCelebration(celebration)}
         />
       ) : (
         selectedHabit && (
@@ -168,17 +184,29 @@ export default function App() {
         habit={activeHabit}
         onConfirm={() => {
           if (activeHabit) {
-            useShield(activeHabit.id, yesterdayStr);
+            useShield(activeHabit.id, pendingShieldDate || yesterdayStr);
           }
+          setPendingShieldDate(null);
           setShieldModalVisible(false);
         }}
         onReject={() => {
           if (activeHabit) {
             resetStreak(activeHabit.id);
           }
+          setPendingShieldDate(null);
           setShieldModalVisible(false);
         }}
-        onClose={() => setShieldModalVisible(false)}
+        onClose={() => {
+          setPendingShieldDate(null);
+          setShieldModalVisible(false);
+        }}
+      />
+
+      {/* Modal de Festejo de Hitos y Reposición de Escudos */}
+      <MilestoneCelebrationModal
+        visible={milestoneCelebration !== null}
+        data={milestoneCelebration}
+        onClose={() => setMilestoneCelebration(null)}
       />
     </>
   );

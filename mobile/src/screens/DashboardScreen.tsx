@@ -15,6 +15,8 @@ import { Habit } from '../types/habit';
 import { sendInstantTestNotification } from '../services/notificationService';
 import { triggerSuccessHaptic, triggerLightHaptic } from '../services/hapticService';
 
+import { MilestoneCelebrationData } from '../components/MilestoneCelebrationModal';
+
 interface DashboardScreenProps {
   onOpenDetail: (habit: Habit) => void;
   onSimulateShield: () => void;
@@ -23,6 +25,7 @@ interface DashboardScreenProps {
   onOpenStickers: () => void;
   onOpenSettings: () => void;
   onOpenMonthlyReview: () => void;
+  onMilestoneReached?: (celebration: MilestoneCelebrationData) => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
@@ -33,6 +36,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenStickers,
   onOpenSettings,
   onOpenMonthlyReview,
+  onMilestoneReached,
 }) => {
   const { habits, logs, toggleDayCompletion } = useHabitStore();
 
@@ -221,13 +225,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     styles.bigCheckButton,
                     isCompletedToday(activeHabit.id) && styles.bigCheckButtonDone,
                   ]}
-                  onPress={() => {
+                  onPress={async () => {
                     if (!isCompletedToday(activeHabit.id)) {
                       triggerSuccessHaptic();
                     } else {
                       triggerLightHaptic();
                     }
-                    toggleDayCompletion(activeHabit.id, todayStr);
+                    const celebration = await toggleDayCompletion(activeHabit.id, todayStr);
+                    if (celebration && onMilestoneReached) {
+                      onMilestoneReached(celebration);
+                    }
                   }}
                 >
                   <Text style={styles.bigCheckButtonText}>

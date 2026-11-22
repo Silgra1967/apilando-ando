@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit, DailyLog, AppSettings, HabitStatus } from '../types/habit';
+import { MilestoneCelebrationData } from '../components/MilestoneCelebrationModal';
 
 interface HabitStore {
   habits: Habit[];
@@ -14,7 +15,7 @@ interface HabitStore {
   promoteToMaintenance: (habitId: string) => Promise<void>;
   graduateToAnchor: (habitId: string) => Promise<void>;
   addNewActiveHabit: (name: string, color: string, anchorText?: string) => Promise<void>;
-  toggleDayCompletion: (habitId: string, dateStr: string) => Promise<void>;
+  toggleDayCompletion: (habitId: string, dateStr: string) => Promise<MilestoneCelebrationData | null>;
   useShield: (habitId: string, dateStr: string) => Promise<void>;
   resetStreak: (habitId: string) => Promise<void>;
   pauseHabit: (habitId: string) => Promise<void>;
@@ -22,6 +23,10 @@ interface HabitStore {
   archiveHabit: (habitId: string) => Promise<void>;
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   resetAllData: () => Promise<void>;
+  checkPendingShieldsAndExpiration: () => Promise<{
+    pendingHabit: Habit;
+    missedDate: string;
+  } | null>;
 }
 
 const STORAGE_KEYS = {
@@ -103,9 +108,11 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     const currentLog = logs[logKey];
     const habit = habits.find((h) => h.id === habitId);
 
-    if (!habit) return;
+    if (!habit) return null;
 
     let updatedLogs = { ...logs };
+    let celebrationResult: MilestoneCelebrationData | null = null;
+
     let updatedHabits = habits.map((h) => {
       if (h.id !== habitId) return h;
 
@@ -132,6 +139,55 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
         const newBest = Math.max(h.bestStreak, newStreak);
         const newTotal = h.totalCompletedDays + 1;
 
+        // Comprobar hitos y reposición de escudo (+1 si tiene menos de 3)
+        let newShields = h.shieldsAvailable;
+        let shieldReplenished = false;
+        let milestoneMet = false;
+        let stickerName = '';
+        let stickerEmoji = '✨';
+
+        if (newStreak === 7) {
+          milestoneMet = true;
+          stickerName = 'Semana Firme';
+          stickerEmoji = '🔥';
+        } else if (newStreak === 14) {
+          milestoneMet = true;
+          stickerName = 'Ritmo Vivo';
+          stickerEmoji = '⚡';
+        } else if (newStreak === 21) {
+          milestoneMet = true;
+          stickerName = 'Hábito Consolidado';
+          stickerEmoji = '🌿';
+        } else if (newStreak === 30) {
+          milestoneMet = true;
+          stickerName = 'Mes Imparable';
+          stickerEmoji = '🌙';
+        } else if (newStreak === 50) {
+          milestoneMet = true;
+          stickerName = 'Mitad de Cien';
+          stickerEmoji = '⭐';
+        } else if (newStreak === 100) {
+          milestoneMet = true;
+          stickerName = 'Centenario Dorado';
+          stickerEmoji = '👑';
+        }
+
+        if (milestoneMet) {
+          if (newShields < 3) {
+            newShields = Math.min(3, newShields + 1);
+            shieldReplenished = true;
+          }
+
+          celebrationResult = {
+            habitName: h.name,
+            streak: newStreak,
+            stickerName,
+            stickerEmoji,
+            shieldReplenished,
+            totalShields: newShields,
+          };
+        }
+
         // Comprobar stickers ganados
         let newStickers = [...h.stickersUnlocked];
         if (newStreak >= 7 && !newStickers.includes('🔥 7 Días')) {
@@ -149,6 +205,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
           currentStreak: newStreak,
           bestStreak: newBest,
           totalCompletedDays: newTotal,
+          shieldsAvailable: newShields,
           stickersUnlocked: newStickers,
         };
       }
@@ -160,6 +217,8 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits)),
       AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs)),
     ]);
+
+    return celebrationResult;
   },
 
   useShield: async (habitId, dateStr) => {
@@ -359,5 +418,59 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
         onboardingCompleted: false,
       },
     });
+  },
+
+  checkPendingShieldsAndExpiration: async () => {
+    const { habits, logs } = get();
+    const activeHabit = habits.find((h) => h.status === 'active');
+    if (!activeHabit) return null;
+
+    const now = new Date();
+    // Ayer
+    const yesterday = new Date(Date.now() - 86400000);
+    const yYear = yesterday.getFullYear();
+    const yMonth = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const yDay = String(yesterday.getDate()).padStart(2, '0');
+    const yesterdayStr = `${yYear}-${yMonth}-${yDay}`;
+
+    // Anteayer
+    const dayBefore = new Date(Date.now() - 86400000 * 2);
+    const bYear = dayBefore.getFullYear();
+    const bMonth = String(dayBefore.getMonth() + 1).padStart(2, '0');
+    const bDay = String(dayBefore.getDate()).padStart(2, '0');
+    const dayBeforeStr = `${bYear}-${bMonth}-${bDay}`;
+
+    const yesterdayLog = logs[`${activeHabit.id}_${yesterdayStr}`];
+    const dayBeforeLog = logs[`${activeHabit.id}_${dayBeforeStr}`];
+
+    // 1. Expiración estricta a las 23:59 del día siguiente:
+    // Si anteayer no se tildó ni se protegió y la racha era > 0, se rompió la ventana de confirmación
+    if (
+      (!dayBeforeLog || dayBeforeLog.status === 'missed') &&
+      activeHabit.currentStreak > 0 &&
+      now.getTime() - dayBefore.getTime() > 86400000 * 2
+    ) {
+      // Reiniciar racha por expiración sin culpa
+      const updated = habits.map((h) =>
+        h.id === activeHabit.id ? { ...h, currentStreak: 0 } : h
+      );
+      set({ habits: updated });
+      await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated));
+    }
+
+    // 2. Detección automática de escudo pendiente de ayer
+    // Si ayer no se tildó y hay escudos disponibles y la racha es > 0
+    if (
+      !yesterdayLog &&
+      activeHabit.shieldsAvailable > 0 &&
+      activeHabit.currentStreak > 0
+    ) {
+      return {
+        pendingHabit: activeHabit,
+        missedDate: yesterdayStr,
+      };
+    }
+
+    return null;
   },
 }));
