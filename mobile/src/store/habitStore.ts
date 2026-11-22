@@ -27,6 +27,7 @@ interface HabitStore {
     pendingHabit: Habit;
     missedDate: string;
   } | null>;
+  setSimulatedStreak: (habitId: string, streak: number, shields?: number) => Promise<void>;
 }
 
 const STORAGE_KEYS = {
@@ -472,5 +473,21 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     }
 
     return null;
+  },
+
+  setSimulatedStreak: async (habitId, streak, shields = 1) => {
+    const { habits } = get();
+    const updated = habits.map((h) =>
+      h.id === habitId
+        ? {
+            ...h,
+            currentStreak: streak,
+            bestStreak: Math.max(h.bestStreak, streak),
+            shieldsAvailable: shields,
+          }
+        : h
+    );
+    set({ habits: updated });
+    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated));
   },
 }));

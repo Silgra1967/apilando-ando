@@ -25,9 +25,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onResetOnboarding,
 }) => {
-  const { settings, updateSettings, habits, resetAllData } = useHabitStore();
+  const { settings, updateSettings, habits, resetAllData, setSimulatedStreak } = useHabitStore();
   const [reminderTime, setReminderTime] = useState(settings.reminderTime || '20:00');
   const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notificationsEnabled);
+  const activeHabit = habits.find((h) => h.status === 'active');
 
   const times = ['07:00', '08:30', '13:00', '19:00', '20:00', '21:30', '22:00'];
 
@@ -152,6 +153,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </View>
               </View>
             </View>
+
+            {/* SIMULADOR RÁPIDO PARA PRUEBAS DE HITOS */}
+            {activeHabit && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Laboratorio de prueba de hitos 🧪</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Colocá tu hábito a 1 día de un hito (con 1 escudo disponible) para probar la reposición y el festejo inmediato al marcarlo en "Mi Día".
+                </Text>
+                <View style={styles.simRow}>
+                  <TouchableOpacity
+                    style={styles.simBtn}
+                    onPress={async () => {
+                      await setSimulatedStreak(activeHabit.id, 6, 1);
+                      Alert.alert('Racha ajustada a 6 días', 'Ahora andá a "Mi Día" y marcá el hábito para ver el festejo del hito de 7 días y la reposición de escudo.');
+                      onClose();
+                    }}
+                  >
+                    <Text style={styles.simBtnText}>Día 6 (para hito 7d 🔥)</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.simBtn}
+                    onPress={async () => {
+                      await setSimulatedStreak(activeHabit.id, 20, 1);
+                      Alert.alert('Racha ajustada a 20 días', 'Ahora andá a "Mi Día" y marcalo para ver el festejo del hito de 21 días, reposición y habilitación de consolidar.');
+                      onClose();
+                    }}
+                  >
+                    <Text style={styles.simBtnText}>Día 20 (para hito 21d 🌿)</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             {/* SECCIÓN ZONA DE PRUEBAS / REINICIO */}
             <View style={styles.dangerSection}>
@@ -317,6 +350,27 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: THEME.colors.border,
+  },
+  simRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  simBtn: {
+    flex: 1,
+    backgroundColor: THEME.colors.sandLight,
+    borderWidth: 1,
+    borderColor: THEME.colors.sand,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: THEME.radius.md,
+    alignItems: 'center',
+  },
+  simBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.colors.dark,
+    textAlign: 'center',
   },
   dangerTitle: {
     fontSize: 13,
