@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Apliando Ando",
+    "slug": "apliando-ando",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +19,15 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Apliando Ando",
+      "shortName": "Apliando",
+      "lang": "es",
+      "display": "standalone",
+      "orientation": "portrait",
+      "backgroundColor": "#FAF7F2",
+      "startUrl": "/",
+      "scope": "/"
     }
   }
 }

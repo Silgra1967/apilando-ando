@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, StatusBar } from 'react-native';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { useHabitStore } from './src/store/habitStore';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
@@ -18,7 +19,7 @@ import { Habit } from './src/types/habit';
 import { THEME } from './src/theme/colors';
 import { scheduleDailyReminder } from './src/services/notificationService';
 
-export default function App() {
+function AppContent() {
   const {
     isLoaded,
     loadFromStorage,
@@ -209,6 +210,14 @@ export default function App() {
         onClose={() => setMilestoneCelebration(null)}
       />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
 
