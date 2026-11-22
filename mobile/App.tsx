@@ -9,6 +9,7 @@ import { AddHabitModal } from './src/components/AddHabitModal';
 import { ConsolidationModal } from './src/components/ConsolidationModal';
 import { StickersModal } from './src/components/StickersModal';
 import { SettingsModal } from './src/components/SettingsModal';
+import { MonthlyReviewModal } from './src/components/MonthlyReviewModal';
 import { Habit } from './src/types/habit';
 import { THEME } from './src/theme/colors';
 import { scheduleDailyReminder } from './src/services/notificationService';
@@ -33,6 +34,7 @@ export default function App() {
   const [stickersModalVisible, setStickersModalVisible] = useState<boolean>(false);
   const [habitForStickers, setHabitForStickers] = useState<Habit | null>(null);
   const [settingsModalVisible, setSettingsModalVisible] = useState<boolean>(false);
+  const [monthlyReviewVisible, setMonthlyReviewVisible] = useState<boolean>(false);
 
   useEffect(() => {
     loadFromStorage();
@@ -87,6 +89,7 @@ export default function App() {
             setStickersModalVisible(true);
           }}
           onOpenSettings={() => setSettingsModalVisible(true)}
+          onOpenMonthlyReview={() => setMonthlyReviewVisible(true)}
         />
       ) : (
         selectedHabit && (
@@ -144,6 +147,18 @@ export default function App() {
         onResetOnboarding={() => {
           setSelectedHabit(null);
           setCurrentScreen('dashboard');
+        }}
+      />
+
+      {/* Modal de Revisión y Balance Mensual */}
+      <MonthlyReviewModal
+        visible={monthlyReviewVisible}
+        onClose={() => setMonthlyReviewVisible(false)}
+        habits={habits}
+        logs={useHabitStore.getState().logs}
+        onPromoteAndAddHabit={async (habit) => {
+          await promoteToMaintenance(habit.id);
+          setAddHabitModalVisible(true);
         }}
       />
 

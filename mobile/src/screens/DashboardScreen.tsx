@@ -13,6 +13,7 @@ import { THEME } from '../theme/colors';
 import { useHabitStore } from '../store/habitStore';
 import { Habit } from '../types/habit';
 import { sendInstantTestNotification } from '../services/notificationService';
+import { triggerSuccessHaptic, triggerLightHaptic } from '../services/hapticService';
 
 interface DashboardScreenProps {
   onOpenDetail: (habit: Habit) => void;
@@ -21,6 +22,7 @@ interface DashboardScreenProps {
   onPromoteHabit: (habit: Habit) => void;
   onOpenStickers: () => void;
   onOpenSettings: () => void;
+  onOpenMonthlyReview: () => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
@@ -30,6 +32,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onPromoteHabit,
   onOpenStickers,
   onOpenSettings,
+  onOpenMonthlyReview,
 }) => {
   const { habits, logs, toggleDayCompletion } = useHabitStore();
 
@@ -69,6 +72,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.headerTitle}>Mi Día</Text>
           </View>
           <View style={styles.headerButtonsRow}>
+            <TouchableOpacity style={styles.reviewHeaderBtn} onPress={onOpenMonthlyReview}>
+              <Text style={styles.reviewHeaderBtnText}>📅 Balance</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.stickersHeaderBtn} onPress={onOpenStickers}>
               <Text style={styles.stickersHeaderBtnText}>🏆</Text>
             </TouchableOpacity>
@@ -133,7 +139,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.checkbox, done && styles.checkboxDone]}
-                    onPress={() => toggleDayCompletion(m.id, todayStr)}
+                    onPress={() => {
+                      triggerLightHaptic();
+                      toggleDayCompletion(m.id, todayStr);
+                    }}
                   >
                     {done && <Text style={styles.checkmark}>✓</Text>}
                   </TouchableOpacity>
@@ -212,7 +221,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     styles.bigCheckButton,
                     isCompletedToday(activeHabit.id) && styles.bigCheckButtonDone,
                   ]}
-                  onPress={() => toggleDayCompletion(activeHabit.id, todayStr)}
+                  onPress={() => {
+                    if (!isCompletedToday(activeHabit.id)) {
+                      triggerSuccessHaptic();
+                    } else {
+                      triggerLightHaptic();
+                    }
+                    toggleDayCompletion(activeHabit.id, todayStr);
+                  }}
                 >
                   <Text style={styles.bigCheckButtonText}>
                     {isCompletedToday(activeHabit.id) ? '✓ Cumplido por hoy' : 'Marcar como hecho'}
@@ -279,6 +295,19 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: THEME.colors.dark,
     marginTop: 2,
+  },
+  reviewHeaderBtn: {
+    backgroundColor: THEME.colors.terracottaLight,
+    borderWidth: 1,
+    borderColor: THEME.colors.terracotta,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: THEME.radius.sm,
+  },
+  reviewHeaderBtnText: {
+    fontSize: 11,
+    color: THEME.colors.terracotta,
+    fontWeight: '800',
   },
   stickersHeaderBtn: {
     backgroundColor: THEME.colors.sandLight,
