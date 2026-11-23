@@ -413,17 +413,23 @@ const createStyles = (colors: ThemeColors) =>
     },
     mainShell: {
       flex: 1,
+      width: '100%',
       backgroundColor: colors.cream,
+      overflow: 'hidden',
     },
     tabBody: {
       flex: 1,
+      width: '100%',
+      overflow: 'hidden',
     },
     tabSafeArea: {
       flex: 1,
+      width: '100%',
       backgroundColor: colors.cream,
       paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 0,
     },
     bottomBarSafe: {
+      width: '100%',
       backgroundColor: colors.white,
       borderTopWidth: 1,
       borderTopColor: colors.border,

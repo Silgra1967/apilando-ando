@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, Platform, StyleSheet, View } from 'react-native';
 import { THEME } from '../theme/colors';
 
@@ -33,7 +33,7 @@ const PARTICLE_COUNT = 28;
 
 export const ConfettiBurst: React.FC<ConfettiBurstProps> = ({ triggerKey }) => {
   const progress = useRef(new Animated.Value(0)).current;
-  const activeRef = useRef(false);
+  const [visible, setVisible] = useState(false);
 
   const particles = useMemo<ParticleSpec[]>(() => {
     const { width, height } = Dimensions.get('window');
@@ -68,7 +68,7 @@ export const ConfettiBurst: React.FC<ConfettiBurstProps> = ({ triggerKey }) => {
   useEffect(() => {
     if (triggerKey <= 0) return;
 
-    activeRef.current = true;
+    setVisible(true);
     progress.setValue(0);
 
     const anim = Animated.timing(progress, {
@@ -78,8 +78,10 @@ export const ConfettiBurst: React.FC<ConfettiBurstProps> = ({ triggerKey }) => {
       useNativeDriver: Platform.OS !== 'web',
     });
 
-    anim.start(() => {
-      activeRef.current = false;
+    anim.start(({ finished }) => {
+      if (finished) {
+        setVisible(false);
+      }
     });
 
     return () => {
@@ -87,7 +89,7 @@ export const ConfettiBurst: React.FC<ConfettiBurstProps> = ({ triggerKey }) => {
     };
   }, [triggerKey, progress]);
 
-  if (triggerKey <= 0) {
+  if (triggerKey <= 0 || !visible) {
     return null;
   }
 
@@ -148,11 +150,13 @@ const styles = StyleSheet.create({
     left: 0,
     zIndex: 999,
     alignItems: 'center',
+    overflow: 'hidden',
   },
   stage: {
     width: '100%',
     maxWidth: 430,
     flex: 1,
+    overflow: 'hidden',
   },
   particle: {
     position: 'absolute',

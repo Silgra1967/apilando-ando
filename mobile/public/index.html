@@ -20,21 +20,25 @@
 
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
-      /* These styles make the body full-height */
+      /* These styles make the body full-height and prevent horizontal overflow/zoom-out on mobile */
       html,
       body {
+        width: 100%;
         height: 100%;
-        background-color: #F7FBF9;
-      }
-      /* These styles disable body scrolling if you are using <ScrollView> */
-      body {
+        margin: 0;
+        padding: 0;
         overflow: hidden;
+        overscroll-behavior: none;
+        background-color: #F7FBF9;
       }
       /* These styles make the root element full-height */
       #root {
         display: flex;
+        flex-direction: column;
+        width: 100%;
         height: 100%;
         flex: 1;
+        overflow: hidden;
       }
     </style>
   </head>

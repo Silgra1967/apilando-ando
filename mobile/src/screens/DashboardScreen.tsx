@@ -515,6 +515,8 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
   StyleSheet.create({
   safeArea: {
     flex: 1,
+    width: '100%',
+    overflow: 'hidden',
     backgroundColor: colors.cream,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0,
   },
