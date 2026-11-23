@@ -40,6 +40,7 @@ export type ThemeMode = 'light' | 'dark';
 export type AppLanguage = 'es' | 'en';
 
 export interface AppSettings {
+  userName?: string;
   reminderTime: string; // "20:00"
   notificationsEnabled: boolean;
   soundEnabled: boolean;

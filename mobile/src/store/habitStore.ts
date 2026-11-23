@@ -11,7 +11,13 @@ interface HabitStore {
   
   // Acciones
   loadFromStorage: () => Promise<void>;
-  createInitialHabit: (name: string, color: string, anchorText?: string, reminderTime?: string) => Promise<void>;
+  createInitialHabit: (
+    name: string,
+    color: string,
+    anchorText?: string,
+    reminderTime?: string,
+    userName?: string
+  ) => Promise<void>;
   promoteToMaintenance: (habitId: string) => Promise<void>;
   graduateToAnchor: (habitId: string) => Promise<void>;
   addNewActiveHabit: (name: string, color: string, anchorText?: string) => Promise<void>;
@@ -80,7 +86,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     }
   },
 
-  createInitialHabit: async (name, color, anchorText, reminderTime = '20:00') => {
+  createInitialHabit: async (name, color, anchorText, reminderTime = '20:00', userName) => {
     const newHabit: Habit = {
       id: Date.now().toString(),
       name: name.trim(),
@@ -97,6 +103,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
     const newSettings: AppSettings = {
       ...get().settings,
+      userName: userName?.trim() || undefined,
       reminderTime,
       onboardingCompleted: true,
     };

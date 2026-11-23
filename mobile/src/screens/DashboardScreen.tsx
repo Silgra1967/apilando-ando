@@ -54,7 +54,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   pendingShieldCount = 0,
   onOpenPendingShields,
 }) => {
-  const { habits, logs, toggleDayCompletion } = useHabitStore();
+  const { habits, logs, settings, toggleDayCompletion } = useHabitStore();
   const { colors, shadows } = useAppTheme();
   const { t, locale } = useTranslation();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
@@ -150,7 +150,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </View>
 
             <View style={styles.greetingRow}>
-              <Text style={styles.greetingTitle}>{t.dashboard.routineTitle}</Text>
+              <Text style={styles.greetingTitle}>
+                {settings.userName
+                  ? formatText(t.dashboard.routineTitleNamed, { name: settings.userName })
+                  : t.dashboard.routineTitle}
+              </Text>
             </View>
           </View>
 

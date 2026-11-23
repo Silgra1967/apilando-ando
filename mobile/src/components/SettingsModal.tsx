@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Modal,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Switch,
@@ -43,6 +44,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const { t, language } = useTranslation();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
 
+  const [userName, setUserName] = useState(settings.userName || '');
   const [reminderTime, setReminderTime] = useState(settings.reminderTime || '20:00');
   const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notificationsEnabled);
   const [confirmingReset, setConfirmingReset] = useState(false);
@@ -111,7 +113,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Text style={styles.sectionTitle}>{t.settings.appearanceTitle}</Text>
               <Text style={styles.sectionSubtitle}>{t.settings.appearanceSub}</Text>
 
-              <Text style={styles.subLabel}>{t.settings.themeLabel}</Text>
+              <Text style={[styles.subLabel, { marginTop: 2 }]}>{t.settings.nameLabel}</Text>
+              <TextInput
+                style={styles.nameInput}
+                placeholder={t.settings.namePlaceholder}
+                placeholderTextColor={colors.outline}
+                value={userName}
+                onChangeText={(val) => {
+                  setUserName(val);
+                  updateSettings({ userName: val.trim() || undefined });
+                }}
+              />
+
+              <Text style={[styles.subLabel, { marginTop: 14 }]}>{t.settings.themeLabel}</Text>
               <View style={styles.segmentedRow}>
                 <TouchableOpacity
                   style={[styles.segmentBtn, themeMode === 'light' && styles.segmentBtnActive]}
@@ -456,6 +470,17 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
     segmentedRow: {
       flexDirection: 'row',
       gap: 8,
+    },
+    nameInput: {
+      backgroundColor: colors.lightGray,
+      borderRadius: THEME.radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontFamily: THEME.fonts.regular,
+      fontSize: 14,
+      color: colors.dark,
     },
     segmentBtn: {
       flex: 1,

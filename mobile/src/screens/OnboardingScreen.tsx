@@ -30,6 +30,7 @@ import { useHabitStore } from '../store/habitStore';
 
 export const OnboardingScreen: React.FC = () => {
   const [step, setStep] = useState<number>(1);
+  const [userName, setUserName] = useState<string>('');
   const [habitName, setHabitName] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>(THEME.palette[0].hex);
   const [anchorText, setAnchorText] = useState<string>('');
@@ -65,7 +66,7 @@ export const OnboardingScreen: React.FC = () => {
   const handleFinish = async () => {
     const fallback = language === 'en' ? 'Walk 15 min' : 'Caminar 15 min';
     const finalName = habitName.trim() || fallback;
-    await createInitialHabit(finalName, selectedColor, anchorText, reminderTime);
+    await createInitialHabit(finalName, selectedColor, anchorText, reminderTime, userName);
   };
 
   const adjustHour = (delta: number) => {
@@ -127,6 +128,18 @@ export const OnboardingScreen: React.FC = () => {
                   {t.onboarding.heroP2}{'\n\n'}
                   <Text style={styles.boldText}>{t.onboarding.heroP3}</Text>
                 </Text>
+
+                <View style={styles.nameBox}>
+                  <Text style={styles.nameLabel}>{t.onboarding.nameLabel}</Text>
+                  <TextInput
+                    style={styles.nameInput}
+                    placeholder={t.onboarding.namePlaceholder}
+                    placeholderTextColor={colors.outline}
+                    value={userName}
+                    onChangeText={setUserName}
+                    returnKeyType="done"
+                  />
+                </View>
               </View>
 
               <TouchableOpacity style={styles.primaryButton} onPress={() => setStep(2)}>
@@ -550,6 +563,30 @@ const createStyles = (colors: ThemeColors) =>
     lineHeight: 23,
     textAlign: 'center',
     paddingHorizontal: 12,
+  },
+  nameBox: {
+    width: '100%',
+    marginTop: 24,
+  },
+  nameLabel: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 13,
+    color: colors.dark,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  nameInput: {
+    width: '100%',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: THEME.radius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontFamily: THEME.fonts.regular,
+    fontSize: 15,
+    color: colors.dark,
+    textAlign: 'center',
   },
   paragraphCenter: {
     fontFamily: THEME.fonts.regular,
