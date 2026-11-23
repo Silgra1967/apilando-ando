@@ -36,12 +36,17 @@ export interface DailyLog {
   loggedAt?: string;
 }
 
+export type ThemeMode = 'light' | 'dark';
+export type AppLanguage = 'es' | 'en';
+
 export interface AppSettings {
   reminderTime: string; // "20:00"
   notificationsEnabled: boolean;
   soundEnabled: boolean;
   onboardingCompleted: boolean;
   lastMonthlyReviewDismissed?: string; // Formato YYYY-MM
+  themeMode: ThemeMode;
+  language: AppLanguage;
 }
 
 /**

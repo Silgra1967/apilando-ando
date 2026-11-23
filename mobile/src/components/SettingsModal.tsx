@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,9 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { THEME } from '../theme/colors';
+import { THEME, ThemeColors } from '../theme/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useTranslation, formatText } from '../i18n/translations';
 import { useHabitStore } from '../store/habitStore';
 import { scheduleDailyReminder } from '../services/notificationService';
 
@@ -34,8 +36,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     resetAllData,
     resumeHabit,
     setSimulatedStreak,
+    simulateSixMonthsReady,
     simulateFullHistoryEnvironment,
   } = useHabitStore();
+  const { colors, shadows, themeMode } = useAppTheme();
+  const { t, language } = useTranslation();
+  const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
+
   const [reminderTime, setReminderTime] = useState(settings.reminderTime || '20:00');
   const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notificationsEnabled);
   const [confirmingReset, setConfirmingReset] = useState(false);
@@ -61,11 +68,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const times = ['07:00', '08:30', '13:00', '19:00', '20:00', '21:30', '22:00'];
 
-  const handleSelectTime = async (t: string) => {
-    setReminderTime(t);
-    await updateSettings({ reminderTime: t });
+  const handleSelectTime = async (time: string) => {
+    setReminderTime(time);
+    await updateSettings({ reminderTime: time });
     if (notificationsEnabled) {
-      await scheduleDailyReminder(t);
+      await scheduleDailyReminder(time);
     }
   };
 
@@ -90,8 +97,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <View style={styles.sheetContainer}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.badgeText}>PREFERENCIAS</Text>
-              <Text style={styles.title}>Configuración</Text>
+              <Text style={styles.badgeText}>{t.settings.kicker}</Text>
+              <Text style={styles.title}>{t.settings.title}</Text>
             </View>
             <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
@@ -99,43 +106,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+            {/* SECCIÓN APARIENCIA E IDIOMA */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t.settings.appearanceTitle}</Text>
+              <Text style={styles.sectionSubtitle}>{t.settings.appearanceSub}</Text>
+
+              <Text style={styles.subLabel}>{t.settings.themeLabel}</Text>
+              <View style={styles.segmentedRow}>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, themeMode === 'light' && styles.segmentBtnActive]}
+                  onPress={() => updateSettings({ themeMode: 'light' })}
+                >
+                  <Text
+                    style={[
+                      styles.segmentBtnText,
+                      themeMode === 'light' && styles.segmentBtnTextActive,
+                    ]}
+                  >
+                    {t.settings.themeLight}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, themeMode === 'dark' && styles.segmentBtnActive]}
+                  onPress={() => updateSettings({ themeMode: 'dark' })}
+                >
+                  <Text
+                    style={[
+                      styles.segmentBtnText,
+                      themeMode === 'dark' && styles.segmentBtnTextActive,
+                    ]}
+                  >
+                    {t.settings.themeDark}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.subLabel, { marginTop: 14 }]}>{t.settings.languageLabel}</Text>
+              <View style={styles.segmentedRow}>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, language === 'es' && styles.segmentBtnActive]}
+                  onPress={() => updateSettings({ language: 'es' })}
+                >
+                  <Text
+                    style={[
+                      styles.segmentBtnText,
+                      language === 'es' && styles.segmentBtnTextActive,
+                    ]}
+                  >
+                    {t.settings.languageEs}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, language === 'en' && styles.segmentBtnActive]}
+                  onPress={() => updateSettings({ language: 'en' })}
+                >
+                  <Text
+                    style={[
+                      styles.segmentBtnText,
+                      language === 'en' && styles.segmentBtnTextActive,
+                    ]}
+                  >
+                    {t.settings.languageEn}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* SECCIÓN NOTIFICACIONES */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recordatorio diario</Text>
-              <Text style={styles.sectionSubtitle}>
-                Un aviso suave al final del día para registrar tu avance sin prisa.
-              </Text>
+              <Text style={styles.sectionTitle}>{t.settings.reminderTitle}</Text>
+              <Text style={styles.sectionSubtitle}>{t.settings.reminderSub}</Text>
 
               <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>Notificaciones activadas</Text>
+                <Text style={styles.switchLabel}>{t.settings.notificationsEnabled}</Text>
                 <Switch
                   value={notificationsEnabled}
                   onValueChange={handleToggleNotifications}
-                  trackColor={{ false: THEME.colors.border, true: THEME.colors.sage }}
-                  thumbColor={notificationsEnabled ? THEME.colors.white : '#F4F3F4'}
+                  trackColor={{ false: colors.border, true: colors.sage }}
+                  thumbColor={notificationsEnabled ? '#FFFFFF' : '#F4F3F4'}
                 />
               </View>
 
               {notificationsEnabled && (
                 <>
-                  <Text style={styles.subLabel}>Horario del recordatorio</Text>
+                  <Text style={styles.subLabel}>{t.settings.reminderTimeLabel}</Text>
                   <View style={styles.timesRow}>
-                    {times.map((t) => (
+                    {times.map((time) => (
                       <TouchableOpacity
-                        key={t}
+                        key={time}
                         style={[
                           styles.timeChip,
-                          reminderTime === t && styles.timeChipActive,
+                          reminderTime === time && styles.timeChipActive,
                         ]}
-                        onPress={() => handleSelectTime(t)}
+                        onPress={() => handleSelectTime(time)}
                       >
                         <Text
                           style={[
                             styles.timeChipText,
-                            reminderTime === t && styles.timeChipTextActive,
+                            reminderTime === time && styles.timeChipTextActive,
                           ]}
                         >
-                          {t}
+                          {time}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -144,45 +215,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </View>
 
-            {/* SECCIÓN ESTADÍSTICAS GENERALES */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Resumen de rutina</Text>
-              <View style={styles.statsCard}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>
-                    {habits.filter((h) => h.status === 'active').length}
-                  </Text>
-                  <Text style={styles.statLabel}>En foco 🌱</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>
-                    {habits.filter((h) => h.status === 'maintenance').length}
-                  </Text>
-                  <Text style={styles.statLabel}>Mantenimiento 🌿</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>
-                    {habits.filter((h) => h.status === 'anchor').length}
-                  </Text>
-                  <Text style={styles.statLabel}>Anclas 🌳</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{pausedHabits.length}</Text>
-                  <Text style={styles.statLabel}>Pausados ⏸️</Text>
-                </View>
-              </View>
-            </View>
-
             {/* SECCIÓN HÁBITOS PAUSADOS Y ARCHIVADOS */}
             {(pausedHabits.length > 0 || archivedHabits.length > 0) && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Pausados y archivados</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Tu historial y stickers se conservan intactos. Podés retomar cuando te sientas listo.
-                </Text>
+                <Text style={styles.sectionTitle}>{t.settings.pausedTitle}</Text>
+                <Text style={styles.sectionSubtitle}>{t.settings.pausedSub}</Text>
 
                 {pausedHabits.map((h) => {
                   const daysPaused = getDaysPaused(h.pausedAt);
@@ -191,11 +228,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <View style={styles.inactiveHabitInfo}>
                         <Text style={styles.inactiveHabitName}>⏸️ {h.name}</Text>
                         <Text style={styles.inactiveHabitMeta}>
-                          En pausa hace {daysPaused} {daysPaused === 1 ? 'día' : 'días'} · Racha conservada: {h.currentStreak}d
+                          {formatText(t.settings.pausedMeta, {
+                            streak: h.currentStreak,
+                            shields: h.shieldsAvailable,
+                          })}
                         </Text>
                         {daysPaused >= 14 && (
                           <Text style={styles.longPauseTag}>
-                            🌿 ¿Listo para retomar con calma?
+                            {language === 'en'
+                              ? `Paused ${daysPaused}d ago · Ready whenever you are`
+                              : `Pausado hace ${daysPaused} días · ¿Retomamos hoy?`}
                           </Text>
                         )}
                       </View>
@@ -204,9 +246,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           style={styles.resumeSmallBtn}
                           onPress={async () => {
                             await resumeHabit(h.id);
+                            handleClose();
                           }}
                         >
-                          <Text style={styles.resumeSmallBtnText}>Reanudar</Text>
+                          <Text style={styles.resumeSmallBtnText}>{t.settings.resumeBtn}</Text>
                         </TouchableOpacity>
                         {onOpenHabitDetail && (
                           <TouchableOpacity
@@ -216,7 +259,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               onOpenHabitDetail(h);
                             }}
                           >
-                            <Text style={styles.viewSmallBtnText}>Ver</Text>
+                            <Text style={styles.viewSmallBtnText}>{t.settings.viewBtn}</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -229,7 +272,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <View style={styles.inactiveHabitInfo}>
                       <Text style={styles.inactiveHabitName}>📦 {h.name}</Text>
                       <Text style={styles.inactiveHabitMeta}>
-                        Archivado · {h.totalCompletedDays}d totales · Récord {h.bestStreak}d
+                        {formatText(t.settings.archivedMeta, {
+                          total: h.totalCompletedDays,
+                          best: h.bestStreak,
+                        })}
                       </Text>
                     </View>
                     {onOpenHabitDetail && (
@@ -240,7 +286,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           onOpenHabitDetail(h);
                         }}
                       >
-                        <Text style={styles.viewSmallBtnText}>Ver historial</Text>
+                        <Text style={styles.viewSmallBtnText}>{t.settings.viewHistoryBtn}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -251,82 +297,75 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* SIMULADOR RÁPIDO PARA PRUEBAS DE HITOS */}
             {activeHabit && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Laboratorio de prueba de hitos 🧪</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Colocá tu hábito a 1 día de un hito (con 1 escudo disponible) para probar la reposición y el festejo inmediato al marcarlo en "Mi Día".
-                </Text>
+                <Text style={styles.sectionTitle}>{t.settings.labTitle}</Text>
+                <Text style={styles.sectionSubtitle}>{t.settings.labSub}</Text>
                 <View style={styles.simRow}>
                   <TouchableOpacity
                     style={styles.simBtn}
                     onPress={async () => {
                       await setSimulatedStreak(activeHabit.id, 6, 1);
-                      notifyIfNative(
-                        'Racha ajustada a 6 días',
-                        'Ahora andá a "Mi Día" y marcá el hábito para ver el festejo del hito de 7 días y la reposición de escudo.'
-                      );
+                      notifyIfNative('6 days', t.settings.labDay6);
                       handleClose();
                     }}
                   >
-                    <Text style={styles.simBtnText}>Día 6 (para hito 7d 🔥)</Text>
+                    <Text style={styles.simBtnText}>{t.settings.labDay6}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.simBtn}
                     onPress={async () => {
                       await setSimulatedStreak(activeHabit.id, 20, 1);
-                      notifyIfNative(
-                        'Racha ajustada a 20 días',
-                        'Ahora andá a "Mi Día" y marcalo para ver el festejo del hito de 21 días, reposición y habilitación de consolidar.'
-                      );
+                      notifyIfNative('20 days', t.settings.labDay20);
                       handleClose();
                     }}
                   >
-                    <Text style={styles.simBtnText}>Día 20 (para hito 21d 🌿)</Text>
+                    <Text style={styles.simBtnText}>{t.settings.labDay20}</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* BOTÓN SIMULAR ENTORNO COMPLETO CON HISTORIAL */}
+                <TouchableOpacity
+                  style={styles.sixMonthsBtn}
+                  onPress={async () => {
+                    await simulateSixMonthsReady(activeHabit.id);
+                    notifyIfNative('6 months', t.settings.lab6Months);
+                    handleClose();
+                  }}
+                >
+                  <Text style={styles.simBtnText}>{t.settings.lab6Months}</Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.fullSimBtn}
                   onPress={async () => {
                     await simulateFullHistoryEnvironment();
-                    notifyIfNative(
-                      '🌱 Rutina completa simulada',
-                      'Se generó una rutina con:\n• 1 Hábito Graduado a Ancla (180d)\n• 1 Hábito en Mantenimiento (45d)\n• 1 Hábito Activo (12d)\n• 1 Hábito Pausado (15d)\n\nPodés explorar su cadena en Mi Día y tocar cualquiera para ver su historial y calendario.'
-                    );
+                    notifyIfNative('Demo', t.settings.labEcosystem);
                     handleClose();
                   }}
                 >
-                  <Text style={styles.fullSimBtnText}>
-                    ✨ Cargar ecosistema completo (Ancla + Mantenimiento + Activo)
-                  </Text>
+                  <Text style={styles.fullSimBtnText}>{t.settings.labEcosystem}</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {/* SECCIÓN ZONA DE PRUEBAS / REINICIO */}
             <View style={styles.dangerSection}>
-              <Text style={styles.dangerTitle}>Datos locales</Text>
-              <Text style={styles.dangerSubtitle}>
-                Apilando Ando guarda todo offline en tu dispositivo. Podés reiniciar para volver a vivir el onboarding.
-              </Text>
+              <Text style={styles.dangerTitle}>{t.settings.localDataTitle}</Text>
+              <Text style={styles.dangerSubtitle}>{t.settings.localDataSub}</Text>
               {!confirmingReset ? (
                 <TouchableOpacity style={styles.resetBtn} onPress={() => setConfirmingReset(true)}>
-                  <Text style={styles.resetBtnText}>🔄 Reiniciar datos y repetir Onboarding</Text>
+                  <Text style={styles.resetBtnText}>{t.settings.resetBtn}</Text>
                 </TouchableOpacity>
               ) : (
                 <View style={styles.confirmBox}>
-                  <Text style={styles.confirmText}>
-                    ¿Seguro que querés reiniciar? Se borrarán tus hábitos actuales y volverás al Onboarding inicial.
-                  </Text>
+                  <Text style={styles.confirmText}>{t.settings.resetConfirmText}</Text>
                   <View style={styles.confirmActions}>
                     <TouchableOpacity
                       style={styles.cancelResetBtn}
                       onPress={() => setConfirmingReset(false)}
                     >
-                      <Text style={styles.cancelResetText}>Cancelar</Text>
+                      <Text style={styles.cancelResetText}>{t.settings.cancel}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.confirmResetBtn} onPress={handleConfirmReset}>
-                      <Text style={styles.confirmResetText}>Sí, reiniciar</Text>
+                      <Text style={styles.confirmResetText}>{t.settings.confirmReset}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -339,323 +378,337 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(45, 49, 46, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
-    backgroundColor: THEME.colors.cream,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 24,
-    paddingHorizontal: THEME.spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
-    maxHeight: '90%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  badgeText: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 11,
-    color: THEME.colors.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  title: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 21,
-    color: THEME.colors.dark,
-  },
-  closeBtn: {
-    padding: 8,
-    backgroundColor: THEME.colors.white,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  closeBtnText: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 14,
-    color: THEME.colors.muted,
-  },
-  content: {
-    paddingBottom: 24,
-  },
-  section: {
-    backgroundColor: THEME.colors.white,
-    borderRadius: THEME.radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 15,
-    color: THEME.colors.dark,
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 11,
-    color: THEME.colors.muted,
-    lineHeight: 16,
-    marginBottom: 14,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  switchLabel: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 13,
-    color: THEME.colors.dark,
-  },
-  subLabel: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 11,
-    color: THEME.colors.muted,
-    textTransform: 'uppercase',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  timesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  timeChip: {
-    backgroundColor: THEME.colors.lightGray,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  timeChipActive: {
-    backgroundColor: THEME.colors.dark,
-    borderColor: THEME.colors.dark,
-  },
-  timeChipText: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 11,
-    color: THEME.colors.dark,
-  },
-  timeChipTextActive: {
-    color: THEME.colors.white,
-  },
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: THEME.colors.lightGray,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 12,
-    marginTop: 4,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 19,
-    color: THEME.colors.dark,
-  },
-  statLabel: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 10,
-    color: THEME.colors.muted,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: THEME.colors.border,
-    height: '70%',
-    alignSelf: 'center',
-  },
-  dangerSection: {
-    backgroundColor: THEME.colors.white,
-    borderRadius: THEME.radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  simRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-  },
-  simBtn: {
-    flex: 1,
-    backgroundColor: THEME.colors.sandLight,
-    borderWidth: 1,
-    borderColor: THEME.colors.sand,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: THEME.radius.md,
-    alignItems: 'center',
-  },
-  simBtnText: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 11,
-    color: THEME.colors.dark,
-    textAlign: 'center',
-  },
-  fullSimBtn: {
-    backgroundColor: THEME.colors.sageLight,
-    borderWidth: 1,
-    borderColor: THEME.colors.sage,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: THEME.radius.md,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  fullSimBtnText: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 12,
-    color: THEME.colors.dark,
-    textAlign: 'center',
-  },
-  dangerTitle: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 14,
-    color: THEME.colors.dark,
-    marginBottom: 4,
-  },
-  dangerSubtitle: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 11,
-    color: THEME.colors.muted,
-    lineHeight: 16,
-    marginBottom: 14,
-  },
-  resetBtn: {
-    backgroundColor: '#FDEDEC',
-    borderWidth: 1,
-    borderColor: '#F5B7B1',
-    paddingVertical: 12,
-    borderRadius: THEME.radius.md,
-    alignItems: 'center',
-  },
-  resetBtnText: {
-    fontFamily: THEME.fonts.semibold,
-    color: '#C0392B',
-    fontSize: 12,
-  },
-  confirmBox: {
-    backgroundColor: '#FDEDEC',
-    borderWidth: 1,
-    borderColor: '#F5B7B1',
-    borderRadius: THEME.radius.md,
-    padding: 12,
-  },
-  confirmText: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 12,
-    color: THEME.colors.dark,
-    lineHeight: 17,
-    marginBottom: 10,
-  },
-  confirmActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  cancelResetBtn: {
-    flex: 1,
-    backgroundColor: THEME.colors.white,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    paddingVertical: 10,
-    borderRadius: THEME.radius.md,
-    alignItems: 'center',
-  },
-  cancelResetText: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 12,
-    color: THEME.colors.dark,
-  },
-  confirmResetBtn: {
-    flex: 1,
-    backgroundColor: '#C0392B',
-    paddingVertical: 10,
-    borderRadius: THEME.radius.md,
-    alignItems: 'center',
-  },
-  confirmResetText: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 12,
-    color: THEME.colors.white,
-  },
-  inactiveHabitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: THEME.colors.surfaceLow,
-    borderRadius: THEME.radius.md,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    padding: 12,
-    marginBottom: 8,
-    gap: 10,
-  },
-  inactiveHabitInfo: {
-    flex: 1,
-  },
-  inactiveHabitName: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 13,
-    color: THEME.colors.dark,
-  },
-  inactiveHabitMeta: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 11,
-    color: THEME.colors.muted,
-    marginTop: 2,
-  },
-  longPauseTag: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 11,
-    color: THEME.colors.aquaDark,
-    marginTop: 4,
-  },
-  inactiveActions: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  resumeSmallBtn: {
-    backgroundColor: THEME.colors.aqua,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: THEME.radius.full,
-  },
-  resumeSmallBtnText: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 11,
-    color: THEME.colors.aquaDark,
-  },
-  viewSmallBtn: {
-    backgroundColor: THEME.colors.white,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: THEME.radius.full,
-  },
-  viewSmallBtnText: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 11,
-    color: THEME.colors.dark,
-  },
-});
+const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppTheme>['shadows']) =>
+  StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(18, 30, 28, 0.55)',
+      justifyContent: 'flex-end',
+    },
+    sheetContainer: {
+      width: '100%',
+      maxWidth: 480,
+      alignSelf: 'center',
+      backgroundColor: colors.cream,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingTop: 24,
+      paddingHorizontal: THEME.spacing.lg,
+      paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+      maxHeight: '90%',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 16,
+    },
+    badgeText: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 11,
+      color: colors.muted,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 4,
+    },
+    title: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 21,
+      color: colors.dark,
+    },
+    closeBtn: {
+      padding: 8,
+      backgroundColor: colors.white,
+      borderRadius: THEME.radius.full,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    closeBtnText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 14,
+      color: colors.muted,
+    },
+    content: {
+      paddingBottom: 24,
+    },
+    section: {
+      backgroundColor: colors.white,
+      borderRadius: THEME.radius.lg,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 16,
+      ...shadows.card,
+    },
+    sectionTitle: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 15,
+      color: colors.dark,
+      marginBottom: 4,
+    },
+    sectionSubtitle: {
+      fontFamily: THEME.fonts.regular,
+      fontSize: 11,
+      color: colors.muted,
+      lineHeight: 16,
+      marginBottom: 14,
+    },
+    segmentedRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    segmentBtn: {
+      flex: 1,
+      backgroundColor: colors.lightGray,
+      borderRadius: THEME.radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    segmentBtnActive: {
+      backgroundColor: colors.dark,
+      borderColor: colors.dark,
+    },
+    segmentBtnText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 13,
+      color: colors.dark,
+    },
+    segmentBtnTextActive: {
+      color: colors.cream,
+      fontFamily: THEME.fonts.semibold,
+    },
+    switchRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 8,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    switchLabel: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 14,
+      color: colors.dark,
+    },
+    subLabel: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 11,
+      color: colors.muted,
+      marginTop: 10,
+      marginBottom: 8,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    timesRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    timeChip: {
+      backgroundColor: colors.lightGray,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: THEME.radius.full,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    timeChipActive: {
+      backgroundColor: colors.dark,
+      borderColor: colors.dark,
+    },
+    timeChipText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 12,
+      color: colors.dark,
+    },
+    timeChipTextActive: {
+      color: colors.cream,
+    },
+    dangerSection: {
+      backgroundColor: colors.white,
+      borderRadius: THEME.radius.lg,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...shadows.card,
+    },
+    simRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 4,
+    },
+    simBtn: {
+      flex: 1,
+      backgroundColor: colors.sandLight,
+      borderWidth: 1,
+      borderColor: colors.sand,
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      borderRadius: THEME.radius.md,
+      alignItems: 'center',
+    },
+    simBtnText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 11,
+      color: colors.dark,
+      textAlign: 'center',
+    },
+    sixMonthsBtn: {
+      backgroundColor: colors.aquaLight,
+      borderWidth: 1,
+      borderColor: colors.aqua,
+      paddingVertical: 11,
+      paddingHorizontal: 12,
+      borderRadius: THEME.radius.md,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    fullSimBtn: {
+      backgroundColor: colors.sageLight,
+      borderWidth: 1,
+      borderColor: colors.sage,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: THEME.radius.md,
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    fullSimBtnText: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 12,
+      color: colors.dark,
+      textAlign: 'center',
+    },
+    dangerTitle: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 15,
+      color: colors.terracotta,
+      marginBottom: 4,
+    },
+    dangerSubtitle: {
+      fontFamily: THEME.fonts.regular,
+      fontSize: 12,
+      color: colors.muted,
+      lineHeight: 17,
+      marginBottom: 12,
+    },
+    resetBtn: {
+      backgroundColor: colors.coralLight,
+      paddingVertical: 12,
+      borderRadius: THEME.radius.md,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.coral,
+    },
+    resetBtnText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 13,
+      color: colors.coral,
+    },
+    confirmBox: {
+      backgroundColor: colors.coralLight,
+      padding: 12,
+      borderRadius: THEME.radius.md,
+      borderWidth: 1,
+      borderColor: colors.coral,
+    },
+    confirmText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 12,
+      color: colors.dark,
+      marginBottom: 10,
+      lineHeight: 17,
+    },
+    confirmActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    cancelResetBtn: {
+      flex: 1,
+      backgroundColor: colors.white,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 10,
+      borderRadius: THEME.radius.md,
+      alignItems: 'center',
+    },
+    cancelResetText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 12,
+      color: colors.dark,
+    },
+    confirmResetBtn: {
+      flex: 1,
+      backgroundColor: '#C0392B',
+      paddingVertical: 10,
+      borderRadius: THEME.radius.md,
+      alignItems: 'center',
+    },
+    confirmResetText: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 12,
+      color: '#FFFFFF',
+    },
+    inactiveHabitRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surfaceLow,
+      borderRadius: THEME.radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 12,
+      marginBottom: 8,
+      gap: 10,
+    },
+    inactiveHabitInfo: {
+      flex: 1,
+    },
+    inactiveHabitName: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 13,
+      color: colors.dark,
+    },
+    inactiveHabitMeta: {
+      fontFamily: THEME.fonts.regular,
+      fontSize: 11,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    longPauseTag: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 11,
+      color: colors.aquaDark,
+      marginTop: 4,
+    },
+    inactiveActions: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    resumeSmallBtn: {
+      backgroundColor: colors.aqua,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: THEME.radius.full,
+    },
+    resumeSmallBtnText: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 11,
+      color: '#121E1C',
+    },
+    viewSmallBtn: {
+      backgroundColor: colors.white,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: THEME.radius.full,
+    },
+    viewSmallBtnText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 11,
+      color: colors.dark,
+    },
+  });

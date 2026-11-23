@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
   StyleSheet,
-  Platform,
+  Image,
 } from 'react-native';
-import { THEME } from '../theme/colors';
+import { THEME, ThemeColors } from '../theme/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useTranslation, formatText } from '../i18n/translations';
+import { findMilestoneSticker } from '../types/stickers';
 
 export interface MilestoneCelebrationData {
   habitName: string;
@@ -29,22 +32,39 @@ export const MilestoneCelebrationModal: React.FC<MilestoneCelebrationModalProps>
   data,
   onClose,
 }) => {
+  const { colors } = useAppTheme();
+  const { t } = useTranslation();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (!data) return null;
+
+  const matchedSticker = findMilestoneSticker(data.stickerName) || findMilestoneSticker(data.stickerEmoji);
+  const stickerKey = matchedSticker?.id as keyof typeof t.stickers.items | undefined;
+  const localizedStickerName =
+    stickerKey && t.stickers.items[stickerKey]
+      ? t.stickers.items[stickerKey].name
+      : data.stickerName;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.emojiBurst}>🎉 ✨ 🏆</Text>
-          <Text style={styles.badge}>¡NUEVO HITO DE CONSTANCIA!</Text>
-          <Text style={styles.streakNumber}>{data.streak} DÍAS</Text>
+          <Text style={styles.badge}>{t.modals.milestoneBadge}</Text>
+          <Text style={styles.streakNumber}>
+            {formatText(t.modals.milestoneDays, { count: data.streak })}
+          </Text>
           <Text style={styles.habitTitle}>{data.habitName}</Text>
 
           <View style={styles.stickerBox}>
-            <Text style={styles.stickerEmoji}>{data.stickerEmoji}</Text>
+            {matchedSticker ? (
+              <Image source={matchedSticker.image} style={styles.stickerImage} resizeMode="contain" />
+            ) : (
+              <Text style={styles.stickerEmoji}>{data.stickerEmoji}</Text>
+            )}
             <View style={styles.stickerInfo}>
-              <Text style={styles.stickerUnlockedTag}>Insignia desbloqueada</Text>
-              <Text style={styles.stickerName}>{data.stickerName}</Text>
+              <Text style={styles.stickerUnlockedTag}>{t.modals.milestoneUnlockedTag}</Text>
+              <Text style={styles.stickerName}>{localizedStickerName}</Text>
             </View>
           </View>
 
@@ -52,26 +72,24 @@ export const MilestoneCelebrationModal: React.FC<MilestoneCelebrationModalProps>
             <View style={styles.shieldReplenishBox}>
               <Text style={styles.shieldReplenishIcon}>🛡️</Text>
               <View style={styles.shieldReplenishTextCol}>
-                <Text style={styles.shieldReplenishTitle}>+1 Escudo recuperado</Text>
+                <Text style={styles.shieldReplenishTitle}>{t.modals.milestoneShieldGainTitle}</Text>
                 <Text style={styles.shieldReplenishSub}>
-                  Tu esfuerzo te hace más fuerte. Ahora tenés {data.totalShields}/3 escudos disponibles.
+                  {formatText(t.modals.milestoneShieldGainSub, { count: data.totalShields })}
                 </Text>
               </View>
             </View>
           ) : (
             <View style={styles.shieldFullBox}>
               <Text style={styles.shieldFullText}>
-                🛡️ Mantenés tu protección completa ({data.totalShields}/3 escudos). ¡Imparable!
+                {formatText(t.modals.milestoneShieldFull, { count: data.totalShields })}
               </Text>
             </View>
           )}
 
-          <Text style={styles.friendlyQuote}>
-            "Cada día que sumás es tuyo para siempre."
-          </Text>
+          <Text style={styles.friendlyQuote}>{t.modals.milestoneQuote}</Text>
 
           <TouchableOpacity style={styles.continueBtn} onPress={onClose}>
-            <Text style={styles.continueBtnText}>¡A seguir construyendo! 🌱</Text>
+            <Text style={styles.continueBtnText}>{t.modals.milestoneContinue}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -79,7 +97,8 @@ export const MilestoneCelebrationModal: React.FC<MilestoneCelebrationModalProps>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(45, 49, 46, 0.6)',
@@ -88,7 +107,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   card: {
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 24,
     padding: 24,
     width: '100%',
@@ -107,7 +126,7 @@ const styles = StyleSheet.create({
   badge: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.terracotta,
+    color: colors.terracotta,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 4,
@@ -115,22 +134,22 @@ const styles = StyleSheet.create({
   streakNumber: {
     fontFamily: THEME.fonts.medium,
     fontSize: 32,
-    color: THEME.colors.dark,
+    color: colors.dark,
     marginVertical: 2,
   },
   habitTitle: {
     fontFamily: THEME.fonts.medium,
     fontSize: 16,
-    color: THEME.colors.muted,
+    color: colors.muted,
     marginBottom: 16,
     textAlign: 'center',
   },
   stickerBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.sandLight,
+    backgroundColor: colors.sandLight,
     borderWidth: 1,
-    borderColor: THEME.colors.sand,
+    borderColor: colors.sand,
     borderRadius: THEME.radius.md,
     padding: 12,
     width: '100%',
@@ -140,25 +159,29 @@ const styles = StyleSheet.create({
   stickerEmoji: {
     fontSize: 32,
   },
+  stickerImage: {
+    width: 42,
+    height: 42,
+  },
   stickerInfo: {
     flex: 1,
   },
   stickerUnlockedTag: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 10,
-    color: THEME.colors.muted,
+    color: colors.muted,
     textTransform: 'uppercase',
   },
   stickerName: {
     fontFamily: THEME.fonts.medium,
     fontSize: 14,
-    color: THEME.colors.dark,
+    color: colors.dark,
     marginTop: 2,
   },
   shieldReplenishBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.shieldGoldLight,
+    backgroundColor: colors.shieldGoldLight,
     borderWidth: 1,
     borderColor: '#F9E79F',
     borderRadius: THEME.radius.md,
@@ -186,7 +209,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   shieldFullBox: {
-    backgroundColor: THEME.colors.lightGray,
+    backgroundColor: colors.lightGray,
     borderRadius: THEME.radius.md,
     padding: 10,
     width: '100%',
@@ -195,19 +218,19 @@ const styles = StyleSheet.create({
   shieldFullText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.muted,
+    color: colors.muted,
     textAlign: 'center',
   },
   friendlyQuote: {
     fontFamily: THEME.fonts.regular,
     fontSize: 12,
     fontStyle: 'italic',
-    color: THEME.colors.dark,
+    color: colors.dark,
     textAlign: 'center',
     marginBottom: 18,
   },
   continueBtn: {
-    backgroundColor: THEME.colors.coral,
+    backgroundColor: colors.coral,
     paddingVertical: 14,
     borderRadius: THEME.radius.full,
     width: '100%',
@@ -215,7 +238,7 @@ const styles = StyleSheet.create({
   },
   continueBtnText: {
     fontFamily: THEME.fonts.semibold,
-    color: THEME.colors.white,
+    color: colors.white,
     fontSize: 14,
   },
 });

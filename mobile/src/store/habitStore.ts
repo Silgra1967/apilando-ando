@@ -33,6 +33,7 @@ interface HabitStore {
     missedDate: string;
   } | null>;
   setSimulatedStreak: (habitId: string, streak: number, shields?: number) => Promise<void>;
+  simulateSixMonthsReady: (habitId: string) => Promise<void>;
   simulateFullHistoryEnvironment: () => Promise<void>;
 }
 
@@ -42,15 +43,19 @@ const STORAGE_KEYS = {
   SETTINGS: '@apliando_settings',
 };
 
+const DEFAULT_SETTINGS: AppSettings = {
+  reminderTime: '20:00',
+  notificationsEnabled: true,
+  soundEnabled: true,
+  onboardingCompleted: false,
+  themeMode: 'light',
+  language: 'es',
+};
+
 export const useHabitStore = create<HabitStore>((set, get) => ({
   habits: [],
   logs: {},
-  settings: {
-    reminderTime: '20:00',
-    notificationsEnabled: true,
-    soundEnabled: true,
-    onboardingCompleted: false,
-  },
+  settings: DEFAULT_SETTINGS,
   isLoaded: false,
 
   loadFromStorage: async () => {
@@ -64,12 +69,9 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       set({
         habits: storedHabits ? JSON.parse(storedHabits) : [],
         logs: storedLogs ? JSON.parse(storedLogs) : {},
-        settings: storedSettings ? JSON.parse(storedSettings) : {
-          reminderTime: '20:00',
-          notificationsEnabled: true,
-          soundEnabled: true,
-          onboardingCompleted: false,
-        },
+        settings: storedSettings
+          ? { ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) }
+          : DEFAULT_SETTINGS,
         isLoaded: true,
       });
     } catch (e) {
@@ -465,12 +467,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     set({
       habits: [],
       logs: {},
-      settings: {
-        reminderTime: '20:00',
-        notificationsEnabled: true,
-        soundEnabled: true,
-        onboardingCompleted: false,
-      },
+      settings: DEFAULT_SETTINGS,
     });
   },
 
@@ -553,6 +550,28 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated)),
       AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs)),
     ]);
+  },
+
+  simulateSixMonthsReady: async (habitId) => {
+    const { habits } = get();
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()).toISOString();
+
+    const updated = habits.map((h) =>
+      h.id === habitId
+        ? {
+            ...h,
+            status: 'maintenance' as const,
+            promotedToMaintenanceAt: sixMonthsAgo,
+            currentStreak: Math.max(h.currentStreak, 180),
+            bestStreak: Math.max(h.bestStreak, 180),
+            totalCompletedDays: Math.max(h.totalCompletedDays, 180),
+            shieldsAvailable: 3,
+          }
+        : h
+    );
+    set({ habits: updated });
+    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated));
   },
 
   simulateFullHistoryEnvironment: async () => {

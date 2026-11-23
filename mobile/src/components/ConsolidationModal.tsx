@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
   StyleSheet,
-  Platform,
 } from 'react-native';
-import { THEME } from '../theme/colors';
+import { THEME, ThemeColors } from '../theme/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useTranslation, formatText } from '../i18n/translations';
 import { Habit } from '../types/habit';
 
 interface ConsolidationModalProps {
@@ -23,6 +24,10 @@ export const ConsolidationModal: React.FC<ConsolidationModalProps> = ({
   onConfirmPromote,
   onKeepActive,
 }) => {
+  const { colors } = useAppTheme();
+  const { t } = useTranslation();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (!habit) return null;
 
   return (
@@ -30,23 +35,19 @@ export const ConsolidationModal: React.FC<ConsolidationModalProps> = ({
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.celebrationEmoji}>🎉 🌿</Text>
-          <Text style={styles.badge}>¡Hito de 21 Días Alcanzado!</Text>
-          <Text style={styles.title}>Este hábito ya empieza a ser parte de vos</Text>
-
-          <Text style={styles.description}>
-            Lograste <Text style={styles.bold}>{habit.currentStreak} días seguidos</Text> con{' '}
-            <Text style={styles.bold}>"{habit.name}"</Text>.{'\n\n'}
-            Podés consolidarlo en <Text style={styles.bold}>Mantenimiento</Text> para seguir
-            tildándolo con calma y abrir espacio para{' '}
-            <Text style={styles.bold}>construir tu siguiente hábito activo 🌱</Text>.
+          <Text style={styles.badge}>{t.modals.consolidateKicker}</Text>
+          <Text style={styles.title}>
+            {formatText(t.modals.consolidateTitle, { name: habit.name })}
           </Text>
 
+          <Text style={styles.description}>{t.modals.consolidateText}</Text>
+
           <TouchableOpacity style={styles.primaryBtn} onPress={onConfirmPromote}>
-            <Text style={styles.primaryBtnText}>Consolidar y sumar nuevo hábito 🌿</Text>
+            <Text style={styles.primaryBtnText}>{t.modals.consolidateConfirm}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryBtn} onPress={onKeepActive}>
-            <Text style={styles.secondaryBtnText}>Seguir solo con este un tiempo más</Text>
+            <Text style={styles.secondaryBtnText}>{t.modals.consolidateKeep}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -54,7 +55,8 @@ export const ConsolidationModal: React.FC<ConsolidationModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(45, 49, 46, 0.55)',
@@ -63,7 +65,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   card: {
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 24,
     padding: 24,
     width: '100%',
@@ -82,7 +84,7 @@ const styles = StyleSheet.create({
   badge: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.sage,
+    color: colors.sage,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 6,
@@ -90,24 +92,24 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: THEME.fonts.medium,
     fontSize: 19,
-    color: THEME.colors.dark,
+    color: colors.dark,
     textAlign: 'center',
     marginBottom: 12,
   },
   description: {
     fontFamily: THEME.fonts.regular,
     fontSize: 13,
-    color: THEME.colors.dark,
+    color: colors.dark,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
   },
   bold: {
     fontFamily: THEME.fonts.semibold,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   primaryBtn: {
-    backgroundColor: THEME.colors.coral,
+    backgroundColor: colors.coral,
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: THEME.radius.full,
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: {
     fontFamily: THEME.fonts.medium,
-    color: THEME.colors.muted,
+    color: colors.muted,
     fontSize: 13,
   },
 });

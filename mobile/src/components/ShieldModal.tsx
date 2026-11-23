@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import {
   ScrollView,
 } from 'react-native';
 import { Shield, ArrowRight, Award, Check } from 'lucide-react-native';
-import { THEME } from '../theme/colors';
+import { THEME, ThemeColors } from '../theme/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useTranslation, formatText } from '../i18n/translations';
 import { Habit } from '../types/habit';
 
 interface ShieldModalProps {
@@ -29,6 +31,9 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
   onClose,
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { colors } = useAppTheme();
+  const { t } = useTranslation();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     if (visible) {
@@ -65,7 +70,7 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
           <View style={styles.heroWrap}>
             <View style={styles.heroOuterAura}>
               <View style={styles.heroInnerCircle}>
-                <Shield size={34} color={THEME.colors.coral} />
+                <Shield size={34} color={colors.coral} />
               </View>
               <View style={styles.floatingBadge}>
                 <Text style={styles.floatingBadgeEmoji}>🛡️</Text>
@@ -77,14 +82,13 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
             <>
               <View style={styles.centerHeader}>
                 <View style={styles.empathyPill}>
-                  <Text style={styles.empathyPillText}>🌿 Pausa Comprensiva</Text>
+                  <Text style={styles.empathyPillText}>{t.modals.shieldSingleBadge}</Text>
                 </View>
-                <Text style={styles.title}>¿Querés usar un escudo para ayer?</Text>
+                <Text style={styles.title}>{t.modals.shieldTitleSingle}</Text>
                 <Text style={styles.subtitle}>
-                  A veces la vida se interpone y está bien. Ayer no registraste{' '}
-                  <Text style={styles.boldText}>{singleHabit.name}</Text>. Tu racha de{' '}
-                  <Text style={styles.boldText}>{singleHabit.currentStreak} días</Text> sigue viva si
-                  querés cuidarla hoy.
+                  {formatText(t.modals.shieldSubtitleSingle, {
+                    streak: singleHabit.currentStreak,
+                  })}
                 </Text>
               </View>
 
@@ -95,7 +99,7 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
                     <Text style={styles.shieldEmojis}>
                       {'🛡️'.repeat(Math.max(0, singleHabit.shieldsAvailable))}
                     </Text>
-                    <ArrowRight size={14} color={THEME.colors.outline} />
+                    <ArrowRight size={14} color={colors.outline} />
                     <Text style={styles.shieldEmojis}>
                       {'🛡️'.repeat(remainingAfterUse)}
                       {'⚪'.repeat(Math.max(0, 3 - remainingAfterUse))}
@@ -113,29 +117,25 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
                   style={styles.primaryButton}
                   onPress={() => onConfirmSingle(singleHabit)}
                 >
-                  <Text style={styles.primaryButtonText}>
-                    Sí, proteger mi racha con 1 escudo 🛡️
-                  </Text>
+                  <Text style={styles.primaryButtonText}>{t.modals.shieldConfirmSingle}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.secondaryButton}
                   onPress={() => onRejectSingle(singleHabit)}
                 >
-                  <Text style={styles.secondaryButtonText}>
-                    No, empezar racha de nuevo con calma
-                  </Text>
+                  <Text style={styles.secondaryButtonText}>{t.modals.shieldRejectSingle}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                  <Text style={styles.closeButtonText}>Decidir más tarde</Text>
+                  <Text style={styles.closeButtonText}>{t.modals.shieldLater}</Text>
                 </TouchableOpacity>
               </View>
 
               {singleHabit.status === 'active' && daysTo21 > 0 && (
                 <View style={styles.milestonePreviewBox}>
                   <View style={styles.milestoneIconBox}>
-                    <Award size={20} color={THEME.colors.aquaDark} />
+                    <Award size={20} color={colors.aquaDark} />
                   </View>
                   <View style={styles.milestoneTextCol}>
                     <Text style={styles.milestoneTag}>HITO DE 21 DÍAS 🌿</Text>
@@ -151,15 +151,14 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
             <>
               <View style={styles.centerHeader}>
                 <View style={styles.empathyPill}>
-                  <Text style={styles.empathyPillText}>🌿 Resumen de Ayer</Text>
+                  <Text style={styles.empathyPillText}>
+                    {formatText(t.modals.shieldMultiBadge, { count: habits.length })}
+                  </Text>
                 </View>
                 <Text style={styles.title}>
-                  Ayer quedaron {habits.length} hábitos sin marcar
+                  {formatText(t.modals.shieldTitleMulti, { count: habits.length })}
                 </Text>
-                <Text style={styles.subtitle}>
-                  Elegí cuáles querés proteger hoy con su escudo. Los que queden sin tildar
-                  reiniciarán su racha con calma.
-                </Text>
+                <Text style={styles.subtitle}>{t.modals.shieldSubtitleMulti}</Text>
               </View>
 
               <ScrollView
@@ -178,7 +177,7 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
                     >
                       <View style={[styles.groupedCheck, checked && styles.groupedCheckActive]}>
                         {checked && (
-                          <Check size={15} color={THEME.colors.white} strokeWidth={2.8} />
+                          <Check size={15} color={colors.white} strokeWidth={2.8} />
                         )}
                       </View>
                       <View style={styles.groupedInfo}>
@@ -197,15 +196,11 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
 
               <View style={styles.buttonStack}>
                 <TouchableOpacity style={styles.primaryButton} onPress={handleConfirmGrouped}>
-                  <Text style={styles.primaryButtonText}>
-                    {selectedIds.length > 0
-                      ? `Confirmar protección (${selectedIds.length})`
-                      : 'Reiniciar rachas pendientes'}
-                  </Text>
+                  <Text style={styles.primaryButtonText}>{t.modals.shieldConfirmMulti}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                  <Text style={styles.closeButtonText}>Decidir más tarde</Text>
+                  <Text style={styles.closeButtonText}>{t.modals.shieldLater}</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -216,7 +211,8 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(18, 30, 28, 0.45)',
@@ -226,7 +222,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 430,
     alignSelf: 'center',
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingHorizontal: 22,
@@ -237,7 +233,7 @@ const styles = StyleSheet.create({
   handle: {
     width: 48,
     height: 6,
-    backgroundColor: THEME.colors.border,
+    backgroundColor: colors.border,
     borderRadius: 3,
     alignSelf: 'center',
     marginBottom: 14,
@@ -250,7 +246,7 @@ const styles = StyleSheet.create({
     width: 86,
     height: 86,
     borderRadius: 43,
-    backgroundColor: THEME.colors.coralLight,
+    backgroundColor: colors.coralLight,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -259,7 +255,7 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -270,11 +266,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: THEME.colors.lima,
+    backgroundColor: colors.lima,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: THEME.colors.white,
+    borderColor: colors.white,
   },
   floatingBadgeEmoji: {
     fontSize: 14,
@@ -284,7 +280,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   empathyPill: {
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: THEME.radius.full,
@@ -293,33 +289,33 @@ const styles = StyleSheet.create({
   empathyPillText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.aquaDark,
+    color: colors.aquaDark,
   },
   title: {
     fontFamily: THEME.fonts.medium,
     fontSize: 20,
-    color: THEME.colors.dark,
+    color: colors.dark,
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontFamily: THEME.fonts.regular,
     fontSize: 13,
-    color: THEME.colors.muted,
+    color: colors.muted,
     lineHeight: 20,
     textAlign: 'center',
     paddingHorizontal: 4,
   },
   boldText: {
     fontFamily: THEME.fonts.semibold,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   statusBox: {
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     padding: 14,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     marginBottom: 16,
     gap: 6,
   },
@@ -331,7 +327,7 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
   shieldsCompareRow: {
     flexDirection: 'row',
@@ -344,7 +340,7 @@ const styles = StyleSheet.create({
   statusSub: {
     fontFamily: THEME.fonts.regular,
     fontSize: 11,
-    color: THEME.colors.outline,
+    color: colors.outline,
     lineHeight: 16,
   },
   groupedScroll: {
@@ -358,14 +354,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     borderRadius: 16,
     padding: 12,
   },
   groupedRowChecked: {
-    backgroundColor: THEME.colors.coralLight,
+    backgroundColor: colors.coralLight,
     borderColor: '#F5C4BC',
   },
   groupedCheck: {
@@ -373,14 +369,14 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: THEME.colors.outline,
-    backgroundColor: THEME.colors.white,
+    borderColor: colors.outline,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   groupedCheckActive: {
-    backgroundColor: THEME.colors.coral,
-    borderColor: THEME.colors.coral,
+    backgroundColor: colors.coral,
+    borderColor: colors.coral,
   },
   groupedInfo: {
     flex: 1,
@@ -388,30 +384,30 @@ const styles = StyleSheet.create({
   groupedName: {
     fontFamily: THEME.fonts.medium,
     fontSize: 14,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   groupedMeta: {
     fontFamily: THEME.fonts.regular,
     fontSize: 11,
-    color: THEME.colors.muted,
+    color: colors.muted,
     marginTop: 2,
   },
   buttonStack: {
     gap: 10,
   },
   primaryButton: {
-    backgroundColor: THEME.colors.coral,
+    backgroundColor: colors.coral,
     paddingVertical: 15,
     borderRadius: THEME.radius.full,
     alignItems: 'center',
   },
   primaryButtonText: {
     fontFamily: THEME.fonts.semibold,
-    color: THEME.colors.white,
+    color: colors.white,
     fontSize: 15,
   },
   secondaryButton: {
-    backgroundColor: THEME.colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     paddingVertical: 13,
     borderRadius: THEME.radius.full,
     alignItems: 'center',
@@ -419,7 +415,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 13,
-    color: THEME.colors.coralDark,
+    color: colors.coralDark,
   },
   closeButton: {
     paddingVertical: 6,
@@ -428,24 +424,24 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: THEME.colors.outline,
+    color: colors.outline,
   },
   milestonePreviewBox: {
     marginTop: 14,
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     borderRadius: 18,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
   },
   milestoneIconBox: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -455,14 +451,14 @@ const styles = StyleSheet.create({
   milestoneTag: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 10,
-    color: THEME.colors.coral,
+    color: colors.coral,
     letterSpacing: 0.6,
     marginBottom: 2,
   },
   milestoneCopy: {
     fontFamily: THEME.fonts.regular,
     fontSize: 12,
-    color: THEME.colors.dark,
+    color: colors.dark,
     lineHeight: 17,
   },
 });

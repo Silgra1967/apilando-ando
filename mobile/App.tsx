@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, StatusBar } from 'react-native';
-import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, StatusBar, Platform } from 'react-native';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
+import { Sprout, Trophy, Calendar } from 'lucide-react-native';
 import {
   useFonts,
   PlusJakartaSans_400Regular,
@@ -15,15 +16,17 @@ import { DetailScreen } from './src/screens/DetailScreen';
 import { ShieldModal } from './src/components/ShieldModal';
 import { AddHabitModal } from './src/components/AddHabitModal';
 import { ConsolidationModal } from './src/components/ConsolidationModal';
-import { StickersModal } from './src/components/StickersModal';
+import { StickersModal, StickersContent } from './src/components/StickersModal';
 import { SettingsModal } from './src/components/SettingsModal';
-import { MonthlyReviewModal } from './src/components/MonthlyReviewModal';
+import { MonthlyReviewModal, MonthlyReviewContent } from './src/components/MonthlyReviewModal';
 import {
   MilestoneCelebrationModal,
   MilestoneCelebrationData,
 } from './src/components/MilestoneCelebrationModal';
 import { Habit } from './src/types/habit';
-import { THEME } from './src/theme/colors';
+import { THEME, ThemeColors } from './src/theme/colors';
+import { useAppTheme } from './src/theme/useAppTheme';
+import { useTranslation } from './src/i18n/translations';
 import {
   scheduleDailyReminder,
   scheduleShieldAlert,
@@ -43,6 +46,7 @@ function AppContent() {
     checkPendingShieldsAndExpiration,
   } = useHabitStore();
   const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'detail'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'today' | 'album' | 'month'>('today');
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
   const [shieldModalVisible, setShieldModalVisible] = useState<boolean>(false);
   const [addHabitModalVisible, setAddHabitModalVisible] = useState<boolean>(false);
@@ -56,6 +60,9 @@ function AppContent() {
   const [pendingShieldDate, setPendingShieldDate] = useState<string | null>(null);
   const [pendingShieldHabits, setPendingShieldHabits] = useState<Habit[]>([]);
   const [simulatingShield, setSimulatingShield] = useState<boolean>(false);
+  const { colors, isDark } = useAppTheme();
+  const { t } = useTranslation();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     loadFromStorage();
@@ -99,7 +106,7 @@ function AppContent() {
   if (!isLoaded) {
     return (
       <View style={styles.centerLoading}>
-        <ActivityIndicator size="large" color={THEME.colors.sage} />
+        <ActivityIndicator size="large" color={colors.sage} />
       </View>
     );
   }
@@ -108,7 +115,7 @@ function AppContent() {
   if (!settings.onboardingCompleted || habits.length === 0) {
     return (
       <>
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <OnboardingScreen />
       </>
     );
@@ -131,36 +138,110 @@ function AppContent() {
 
   return (
     <>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {currentScreen === 'dashboard' ? (
-        <DashboardScreen
-          onOpenDetail={(habit) => {
-            setSelectedHabit(habit);
-            setCurrentScreen('detail');
-          }}
-          onSimulateShield={() => {
-            setSimulatingShield(pendingShieldHabits.length === 0);
-            setShieldModalVisible(true);
-          }}
-          onOpenAddHabit={() => setAddHabitModalVisible(true)}
-          onPromoteHabit={(habit) => {
-            setHabitToConsolidate(habit);
-            setConsolidationModalVisible(true);
-          }}
-          onOpenStickers={() => {
-            setHabitForStickers(null);
-            setStickersModalVisible(true);
-          }}
-          onOpenSettings={() => setSettingsModalVisible(true)}
-          onOpenMonthlyReview={() => setMonthlyReviewVisible(true)}
-          onMilestoneReached={(celebration) => setMilestoneCelebration(celebration)}
-          pendingShieldCount={pendingShieldHabits.length}
-          onOpenPendingShields={() => {
-            setSimulatingShield(false);
-            setShieldModalVisible(true);
-          }}
-        />
+        <View style={styles.mainShell}>
+          <View style={styles.tabBody}>
+            {activeTab === 'today' && (
+              <DashboardScreen
+                onOpenDetail={(habit) => {
+                  setSelectedHabit(habit);
+                  setCurrentScreen('detail');
+                }}
+                onSimulateShield={() => {
+                  setSimulatingShield(pendingShieldHabits.length === 0);
+                  setShieldModalVisible(true);
+                }}
+                onOpenAddHabit={() => setAddHabitModalVisible(true)}
+                onPromoteHabit={(habit) => {
+                  setHabitToConsolidate(habit);
+                  setConsolidationModalVisible(true);
+                }}
+                onOpenSettings={() => setSettingsModalVisible(true)}
+                onMilestoneReached={(celebration) => setMilestoneCelebration(celebration)}
+                pendingShieldCount={pendingShieldHabits.length}
+                onOpenPendingShields={() => {
+                  setSimulatingShield(false);
+                  setShieldModalVisible(true);
+                }}
+              />
+            )}
+
+            {activeTab === 'album' && (
+              <SafeAreaView style={styles.tabSafeArea} edges={['top']}>
+                <StickersContent embedded allHabits={habits} />
+              </SafeAreaView>
+            )}
+
+            {activeTab === 'month' && (
+              <SafeAreaView style={styles.tabSafeArea} edges={['top']}>
+                <MonthlyReviewContent
+                  embedded
+                  habits={habits}
+                  logs={useHabitStore.getState().logs}
+                  onPromoteAndAddHabit={async (habit) => {
+                    await promoteToMaintenance(habit.id);
+                    setAddHabitModalVisible(true);
+                  }}
+                  onContinueFocus={() => setActiveTab('today')}
+                />
+              </SafeAreaView>
+            )}
+          </View>
+
+          <SafeAreaView style={styles.bottomBarSafe} edges={['bottom']}>
+            <View style={styles.bottomBar}>
+              <TouchableOpacity
+                style={styles.tabItem}
+                onPress={() => setActiveTab('today')}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.tabIconPill, activeTab === 'today' && styles.tabIconPillActive]}>
+                  <Sprout
+                    size={20}
+                    color={activeTab === 'today' ? colors.coral : colors.muted}
+                  />
+                </View>
+                <Text style={[styles.tabLabel, activeTab === 'today' && styles.tabLabelActive]}>
+                  {t.tabs.today}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.tabItem}
+                onPress={() => setActiveTab('album')}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.tabIconPill, activeTab === 'album' && styles.tabIconPillActive]}>
+                  <Trophy
+                    size={20}
+                    color={activeTab === 'album' ? colors.coral : colors.muted}
+                  />
+                </View>
+                <Text style={[styles.tabLabel, activeTab === 'album' && styles.tabLabelActive]}>
+                  {t.tabs.album}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.tabItem}
+                onPress={() => setActiveTab('month')}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.tabIconPill, activeTab === 'month' && styles.tabIconPillActive]}>
+                  <Calendar
+                    size={20}
+                    color={activeTab === 'month' ? colors.coral : colors.muted}
+                  />
+                </View>
+                <Text style={[styles.tabLabel, activeTab === 'month' && styles.tabLabelActive]}>
+                  {t.tabs.month}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
       ) : (
         selectedHabit && (
           <DetailScreen
@@ -216,6 +297,7 @@ function AppContent() {
         onClose={() => setSettingsModalVisible(false)}
         onResetOnboarding={() => {
           setSelectedHabit(null);
+          setActiveTab('today');
           setCurrentScreen('dashboard');
         }}
         onOpenHabitDetail={(habit) => {
@@ -299,7 +381,7 @@ export default function App() {
 
   if (!fontsLoaded && !fontError) {
     return (
-      <View style={styles.centerLoading}>
+      <View style={loadingStyles.centerLoading}>
         <ActivityIndicator size="large" color={THEME.colors.coral} />
       </View>
     );
@@ -312,7 +394,7 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+const loadingStyles = StyleSheet.create({
   centerLoading: {
     flex: 1,
     backgroundColor: THEME.colors.cream,
@@ -320,3 +402,69 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    centerLoading: {
+      flex: 1,
+      backgroundColor: colors.cream,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    mainShell: {
+      flex: 1,
+      backgroundColor: colors.cream,
+    },
+    tabBody: {
+      flex: 1,
+    },
+    tabSafeArea: {
+      flex: 1,
+      backgroundColor: colors.cream,
+      paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 0,
+    },
+    bottomBarSafe: {
+      backgroundColor: colors.white,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: -3 },
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    bottomBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-around',
+      width: '100%',
+      maxWidth: 480,
+      alignSelf: 'center',
+      paddingTop: 8,
+      paddingBottom: 8,
+      paddingHorizontal: 12,
+    },
+    tabItem: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 3,
+    },
+    tabIconPill: {
+      paddingHorizontal: 16,
+      paddingVertical: 5,
+      borderRadius: THEME.radius.full,
+    },
+    tabIconPillActive: {
+      backgroundColor: colors.coralLight,
+    },
+    tabLabel: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 11,
+      color: colors.muted,
+    },
+    tabLabelActive: {
+      fontFamily: THEME.fonts.semibold,
+      color: colors.coral,
+    },
+  });

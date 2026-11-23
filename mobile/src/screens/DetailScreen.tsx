@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -28,7 +28,9 @@ import {
   Play,
   Sprout,
 } from 'lucide-react-native';
-import { THEME } from '../theme/colors';
+import { THEME, ThemeColors } from '../theme/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useTranslation, formatText } from '../i18n/translations';
 import { Habit, isEligibleForAnchorGraduation } from '../types/habit';
 import { useHabitStore } from '../store/habitStore';
 
@@ -56,6 +58,9 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
 
   const now = new Date();
   const [monthOffset, setMonthOffset] = useState<number>(0);
+  const { colors, shadows } = useAppTheme();
+  const { t, language, locale } = useTranslation();
+  const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
 
   const viewedDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const viewedYear = viewedDate.getFullYear();
@@ -64,7 +69,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
     viewedYear === now.getFullYear() && viewedMonth === now.getMonth();
   const currentDayNum = now.getDate();
 
-  const viewedMonthName = viewedDate.toLocaleDateString('es-ES', {
+  const viewedMonthName = viewedDate.toLocaleDateString(locale, {
     month: 'long',
     year: 'numeric',
   });
@@ -104,14 +109,14 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
 
   const statusLabel =
     habit.status === 'active'
-      ? '🌱 Activo (En construcción)'
+      ? t.detail.statusActive
       : habit.status === 'maintenance'
-      ? '🌿 Mantenimiento'
+      ? t.detail.statusMaintenance
       : habit.status === 'anchor'
-      ? '🌳 Graduado'
+      ? t.detail.statusAnchor
       : habit.status === 'paused'
-      ? '⏸️ Pausado'
-      : '📦 Archivado';
+      ? t.detail.statusPaused
+      : t.detail.statusArchived;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -120,8 +125,8 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           {/* SUB-BARRA DE NAVEGACIÓN & BADGE */}
           <View style={styles.topNav}>
             <TouchableOpacity style={styles.backPill} onPress={onBack}>
-              <ArrowLeft size={16} color={THEME.colors.dark} />
-              <Text style={styles.backPillText}>Volver a Mi Día</Text>
+              <ArrowLeft size={16} color={colors.dark} />
+              <Text style={styles.backPillText}>{t.detail.backToToday}</Text>
             </TouchableOpacity>
 
             <View
@@ -140,24 +145,17 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           <View style={styles.heroCard}>
             <View style={styles.heroTopRow}>
               <View style={styles.heroIconBox}>
-                <Sprout size={26} color={THEME.colors.coral} />
+                <Sprout size={26} color={colors.coral} />
               </View>
               <View style={styles.heroTitleCol}>
                 <Text style={styles.habitTitle}>{habit.name}</Text>
                 {habit.anchorText && (
                   <View style={styles.anchorRow}>
-                    <CornerDownRight size={14} color={THEME.colors.coral} />
+                    <CornerDownRight size={14} color={colors.coral} />
                     <Text style={styles.habitAnchor}>{habit.anchorText}</Text>
                   </View>
                 )}
               </View>
-            </View>
-
-            <View style={styles.heroFooterStrip}>
-              <Text style={styles.heroFooterLabel}>
-                Total acumulado: {habit.totalCompletedDays} días cumplidos
-              </Text>
-              <Text style={styles.heroFooterTag}>1/1 diario</Text>
             </View>
           </View>
 
@@ -166,38 +164,40 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
             <View style={styles.metricCard}>
               <View style={styles.metricHead}>
                 <Text style={styles.metricLabel}>RACHA</Text>
-                <Flame size={16} color={THEME.colors.coral} />
+                <Flame size={16} color={colors.coral} />
               </View>
               <View style={styles.metricValueRow}>
                 <Text style={styles.metricValue}>{habit.currentStreak}</Text>
-                <Text style={styles.metricUnit}>días</Text>
+                <Text style={styles.metricUnit}>{t.detail.days}</Text>
               </View>
-              <Text style={styles.metricSubCoral}>Constante</Text>
+              <Text style={styles.metricSubCoral}>
+                {habit.currentStreak > 0 ? t.detail.constant : t.detail.starting}
+              </Text>
             </View>
 
             <View style={styles.metricCard}>
               <View style={styles.metricHead}>
-                <Text style={styles.metricLabel}>RÉCORD</Text>
-                <Trophy size={16} color={THEME.colors.aquaDark} />
+                <Text style={styles.metricLabel}>{t.detail.record}</Text>
+                <Trophy size={16} color={colors.aquaDark} />
               </View>
               <View style={styles.metricValueRow}>
                 <Text style={styles.metricValue}>{habit.bestStreak}</Text>
-                <Text style={styles.metricUnit}>días</Text>
+                <Text style={styles.metricUnit}>{t.detail.days}</Text>
               </View>
-              <Text style={styles.metricSubMuted}>Mejor marca</Text>
+              <Text style={styles.metricSubMuted}>{t.detail.bestMark}</Text>
             </View>
 
             <View style={styles.metricCard}>
               <View style={styles.metricHead}>
-                <Text style={styles.metricLabel}>ESCUDOS</Text>
-                <Shield size={16} color={THEME.colors.shieldGold} />
+                <Text style={styles.metricLabel}>{t.detail.shields}</Text>
+                <Shield size={16} color={colors.shieldGold} />
               </View>
               <View style={styles.metricValueRow}>
                 <Text style={styles.metricValue}>{habit.shieldsAvailable}</Text>
                 <Text style={styles.metricUnit}>/3</Text>
               </View>
               <Text style={styles.metricSubGold}>
-                {habit.shieldsAvailable < 3 ? '+1 en hito' : 'Completa'}
+                {habit.shieldsAvailable < 3 ? t.detail.shieldHint : '3/3'}
               </Text>
             </View>
           </View>
@@ -206,7 +206,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           <View style={styles.calendarBox}>
             <View style={styles.calendarHeader}>
               <View style={styles.calendarTitleRow}>
-                <Calendar size={18} color={THEME.colors.coral} />
+                <Calendar size={18} color={colors.coral} />
                 <Text style={styles.calendarTitle}>{capitalizedMonth}</Text>
               </View>
               <View style={styles.calendarNavRow}>
@@ -214,7 +214,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                   style={styles.calendarNavBtn}
                   onPress={() => setMonthOffset((prev) => prev - 1)}
                 >
-                  <ChevronLeft size={18} color={THEME.colors.dark} />
+                  <ChevronLeft size={18} color={colors.dark} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.calendarNavBtn, isCurrentMonth && styles.calendarNavBtnDisabled]}
@@ -223,14 +223,17 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                 >
                   <ChevronRight
                     size={18}
-                    color={isCurrentMonth ? THEME.colors.outline : THEME.colors.dark}
+                    color={isCurrentMonth ? colors.outline : colors.dark}
                   />
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.weekDaysRow}>
-              {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, idx) => (
+              {(language === 'en'
+                ? ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+                : ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+              ).map((d, idx) => (
                 <Text key={idx} style={styles.weekDayText}>
                   {d}
                 </Text>
@@ -260,7 +263,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                       {isDone ? (
                         <Check size={15} color="#003836" strokeWidth={2.8} />
                       ) : isShield ? (
-                        <Shield size={14} color={THEME.colors.shieldGold} />
+                        <Shield size={14} color={colors.shieldGold} />
                       ) : (
                         <Text style={[styles.dayNumber, isToday && styles.dayNumberToday]}>
                           {cell.num}
@@ -277,34 +280,34 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
 
             <View style={styles.legendRow}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: THEME.colors.aqua }]} />
-                <Text style={styles.legendText}>Cumplido</Text>
+                <View style={[styles.legendDot, { backgroundColor: colors.aqua }]} />
+                <Text style={styles.legendText}>{t.detail.legendCompleted}</Text>
               </View>
               <View style={styles.legendItem}>
                 <View
                   style={[
                     styles.legendDot,
                     {
-                      backgroundColor: THEME.colors.shieldGoldLight,
+                      backgroundColor: colors.shieldGoldLight,
                       borderWidth: 1,
-                      borderColor: THEME.colors.shieldGold,
+                      borderColor: colors.shieldGold,
                     },
                   ]}
                 />
-                <Text style={styles.legendText}>Escudo protector</Text>
+                <Text style={styles.legendText}>{t.detail.legendShielded}</Text>
               </View>
               <View style={styles.legendItem}>
                 <View
                   style={[
                     styles.legendDot,
                     {
-                      backgroundColor: THEME.colors.cream,
+                      backgroundColor: colors.cream,
                       borderWidth: 1.5,
-                      borderColor: THEME.colors.coral,
+                      borderColor: colors.coral,
                     },
                   ]}
                 />
-                <Text style={styles.legendText}>Hoy</Text>
+                <Text style={styles.legendText}>{t.detail.legendToday}</Text>
               </View>
             </View>
           </View>
@@ -317,11 +320,11 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           >
             <View style={styles.stickersLeft}>
               <View style={styles.stickersIconCircle}>
-                <Award size={20} color={THEME.colors.coral} />
+                <Award size={20} color={colors.coral} />
               </View>
               <View style={styles.stickersTextCol}>
                 <Text style={styles.stickersKicker}>
-                  Último Desbloqueo ({habit.stickersUnlocked.length} ganados)
+                  {formatText(t.detail.lastUnlocked, { count: habit.stickersUnlocked.length })}
                 </Text>
                 <Text style={styles.stickersTitle} numberOfLines={1}>
                   {latestSticker}
@@ -329,8 +332,8 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
               </View>
             </View>
             <View style={styles.albumLinkRow}>
-              <Text style={styles.albumLinkText}>Álbum</Text>
-              <ArrowRight size={15} color={THEME.colors.coral} />
+              <Text style={styles.albumLinkText}>{t.detail.albumLink}</Text>
+              <ArrowRight size={15} color={colors.coral} />
             </View>
           </TouchableOpacity>
 
@@ -340,11 +343,11 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
               <View style={styles.lifecycleProgressBlock}>
                 <View style={styles.lifecycleHeader}>
                   <View style={styles.lifecycleTitleRow}>
-                    <Leaf size={15} color={THEME.colors.limaDark} />
-                    <Text style={styles.lifecycleTitle}>Camino a Mantenimiento</Text>
+                    <Leaf size={15} color={colors.limaDark} />
+                    <Text style={styles.lifecycleTitle}>{t.detail.pathToMaintenance}</Text>
                   </View>
                   <Text style={styles.lifecycleCount}>
-                    {habit.currentStreak} de 21 días ({progressPct}%)
+                    {formatText(t.detail.daysOf21, { count: habit.currentStreak, pct: progressPct })}
                   </Text>
                 </View>
 
@@ -354,8 +357,8 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
 
                 <Text style={styles.lifecycleHint}>
                   {daysRemainingTo21 > 0
-                    ? `Faltan solo ${daysRemainingTo21} días para habilitar la consolidación a 🌿 Mantenimiento.`
-                    : '¡Cumpliste los 21 días! Ya podés consolidar este hábito y sumar uno nuevo.'}
+                    ? formatText(t.detail.remainingToMaintenance, { count: daysRemainingTo21 })
+                    : t.detail.readyToMaintenance}
                 </Text>
 
                 {habit.currentStreak >= 21 ? (
@@ -366,13 +369,13 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                       if (onOpenAddHabit) onOpenAddHabit();
                     }}
                   >
-                    <Text style={styles.promoteBtnText}>🌿 Consolidar a Mantenimiento</Text>
+                    <Text style={styles.promoteBtnText}>{t.detail.promoteMaintenanceBtn}</Text>
                   </TouchableOpacity>
                 ) : (
                   <View style={styles.promoteBtnDisabled}>
-                    <Lock size={16} color={THEME.colors.outline} />
+                    <Lock size={16} color={colors.outline} />
                     <Text style={styles.promoteBtnDisabledText}>
-                      🌿 Consolidar a Mantenimiento (En {daysRemainingTo21} días)
+                      {t.detail.pathToMaintenance} ({daysRemainingTo21}d)
                     </Text>
                   </View>
                 )}
@@ -408,7 +411,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                     await resumeHabit(habit.id);
                   }}
                 >
-                  <Play size={15} color={THEME.colors.aquaDark} />
+                  <Play size={15} color={colors.aquaDark} />
                   <Text style={styles.actionPillText}>Reanudar hábito</Text>
                 </TouchableOpacity>
               ) : (
@@ -419,7 +422,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                       await pauseHabit(habit.id);
                     }}
                   >
-                    <PauseCircle size={15} color={THEME.colors.aquaDark} />
+                    <PauseCircle size={15} color={colors.aquaDark} />
                     <Text style={styles.actionPillText}>Pausar sin culpa</Text>
                   </TouchableOpacity>
                 )
@@ -433,7 +436,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                     onBack();
                   }}
                 >
-                  <Archive size={15} color={THEME.colors.coral} />
+                  <Archive size={15} color={colors.coral} />
                   <Text style={styles.actionPillText}>Archivar con paz</Text>
                 </TouchableOpacity>
               )}
@@ -449,10 +452,11 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppTheme>['shadows']) =>
+  StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: THEME.colors.cream,
+    backgroundColor: colors.cream,
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 0,
   },
   container: {
@@ -476,7 +480,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: THEME.colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: THEME.radius.full,
@@ -484,42 +488,43 @@ const styles = StyleSheet.create({
   backPillText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: THEME.colors.lima,
+    backgroundColor: colors.lima,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: THEME.radius.full,
   },
   statusBadgeMaintenance: {
-    backgroundColor: THEME.colors.aquaLight,
+    backgroundColor: colors.aquaLight,
     borderWidth: 1,
-    borderColor: THEME.colors.aqua,
+    borderColor: colors.aqua,
   },
   statusBadgeNeutral: {
-    backgroundColor: THEME.colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
   },
   statusDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: THEME.colors.coral,
+    backgroundColor: colors.coral,
   },
   statusBadgeText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   heroCard: {
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 24,
     padding: 18,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
+    ...shadows.card,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -530,7 +535,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 18,
-    backgroundColor: THEME.colors.coralLight,
+    backgroundColor: colors.coralLight,
     borderWidth: 1,
     borderColor: '#F5C4BC',
     alignItems: 'center',
@@ -542,7 +547,7 @@ const styles = StyleSheet.create({
   habitTitle: {
     fontFamily: THEME.fonts.medium,
     fontSize: 21,
-    color: THEME.colors.dark,
+    color: colors.dark,
     lineHeight: 28,
   },
   anchorRow: {
@@ -554,28 +559,8 @@ const styles = StyleSheet.create({
   habitAnchor: {
     fontFamily: THEME.fonts.medium,
     fontSize: 13,
-    color: THEME.colors.coral,
+    color: colors.coral,
     flex: 1,
-  },
-  heroFooterStrip: {
-    marginTop: 14,
-    backgroundColor: THEME.colors.surfaceLow,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  heroFooterLabel: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 12,
-    color: THEME.colors.muted,
-  },
-  heroFooterTag: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 11,
-    color: THEME.colors.coral,
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -583,12 +568,13 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 20,
     padding: 12,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     justifyContent: 'space-between',
+    ...shadows.card,
   },
   metricHead: {
     flexDirection: 'row',
@@ -598,7 +584,7 @@ const styles = StyleSheet.create({
   metricLabel: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 10,
-    color: THEME.colors.outline,
+    color: colors.outline,
     letterSpacing: 0.6,
   },
   metricValueRow: {
@@ -610,37 +596,38 @@ const styles = StyleSheet.create({
   metricValue: {
     fontFamily: THEME.fonts.medium,
     fontSize: 22,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   metricUnit: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.outline,
+    color: colors.outline,
   },
   metricSubCoral: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.coral,
+    color: colors.coral,
     marginTop: 2,
   },
   metricSubMuted: {
     fontFamily: THEME.fonts.regular,
     fontSize: 11,
-    color: THEME.colors.muted,
+    color: colors.muted,
     marginTop: 2,
   },
   metricSubGold: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.shieldGold,
+    color: colors.shieldGold,
     marginTop: 2,
   },
   calendarBox: {
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 24,
     padding: 16,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
+    ...shadows.card,
   },
   calendarHeader: {
     flexDirection: 'row',
@@ -656,7 +643,7 @@ const styles = StyleSheet.create({
   calendarTitle: {
     fontFamily: THEME.fonts.medium,
     fontSize: 17,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   calendarNavRow: {
     flexDirection: 'row',
@@ -667,9 +654,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -685,7 +672,7 @@ const styles = StyleSheet.create({
     width: '14.28%',
     textAlign: 'center',
     fontSize: 11,
-    color: THEME.colors.outline,
+    color: colors.outline,
   },
   daysGrid: {
     flexDirection: 'row',
@@ -708,31 +695,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayCellDone: {
-    backgroundColor: THEME.colors.aqua,
+    backgroundColor: colors.aqua,
   },
   dayCellShield: {
-    backgroundColor: THEME.colors.shieldGoldLight,
+    backgroundColor: colors.shieldGoldLight,
     borderWidth: 1,
     borderColor: '#FFCDAC',
   },
   dayCellToday: {
-    backgroundColor: THEME.colors.cream,
+    backgroundColor: colors.cream,
     borderWidth: 2,
-    borderColor: THEME.colors.coral,
+    borderColor: colors.coral,
   },
   dayNumber: {
     fontFamily: THEME.fonts.medium,
     fontSize: 13,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
   dayNumberToday: {
     fontFamily: THEME.fonts.semibold,
-    color: THEME.colors.coral,
+    color: colors.coral,
   },
   daySubNum: {
     fontFamily: THEME.fonts.medium,
     fontSize: 9,
-    color: THEME.colors.outline,
+    color: colors.outline,
     marginTop: 2,
   },
   legendRow: {
@@ -741,7 +728,7 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: THEME.colors.surfaceLow,
+    borderTopColor: colors.surfaceLow,
   },
   legendItem: {
     flexDirection: 'row',
@@ -756,18 +743,19 @@ const styles = StyleSheet.create({
   legendText: {
     fontFamily: THEME.fonts.regular,
     fontSize: 11,
-    color: THEME.colors.outline,
+    color: colors.outline,
   },
   stickersBox: {
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
+    ...shadows.card,
   },
   stickersLeft: {
     flexDirection: 'row',
@@ -779,7 +767,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -789,12 +777,12 @@ const styles = StyleSheet.create({
   stickersKicker: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.aquaDark,
+    color: colors.aquaDark,
   },
   stickersTitle: {
     fontFamily: THEME.fonts.medium,
     fontSize: 15,
-    color: THEME.colors.dark,
+    color: colors.dark,
     marginTop: 2,
   },
   albumLinkRow: {
@@ -805,15 +793,16 @@ const styles = StyleSheet.create({
   albumLinkText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 12,
-    color: THEME.colors.coral,
+    color: colors.coral,
   },
   actionsBox: {
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 24,
     padding: 18,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     gap: 14,
+    ...shadows.card,
   },
   lifecycleProgressBlock: {
     gap: 10,
@@ -831,33 +820,33 @@ const styles = StyleSheet.create({
   lifecycleTitle: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 13,
-    color: THEME.colors.aquaDark,
+    color: colors.aquaDark,
   },
   lifecycleCount: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.outline,
+    color: colors.outline,
   },
   progressTrack: {
     height: 11,
-    backgroundColor: THEME.colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: 99,
     overflow: 'hidden',
     padding: 2,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: THEME.colors.lima,
+    backgroundColor: colors.lima,
     borderRadius: 99,
   },
   lifecycleHint: {
     fontFamily: THEME.fonts.regular,
     fontSize: 12,
-    color: THEME.colors.muted,
+    color: colors.muted,
     lineHeight: 18,
   },
   promoteBtn: {
-    backgroundColor: THEME.colors.lima,
+    backgroundColor: colors.lima,
     paddingVertical: 15,
     borderRadius: THEME.radius.full,
     alignItems: 'center',
@@ -865,10 +854,10 @@ const styles = StyleSheet.create({
   promoteBtnText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 14,
-    color: THEME.colors.limaDark,
+    color: colors.limaDark,
   },
   promoteBtnDisabled: {
-    backgroundColor: THEME.colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     paddingVertical: 15,
     paddingHorizontal: 14,
     borderRadius: THEME.radius.full,
@@ -880,29 +869,29 @@ const styles = StyleSheet.create({
   promoteBtnDisabledText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 13,
-    color: THEME.colors.outline,
+    color: colors.outline,
   },
   graduateBtn: {
-    backgroundColor: THEME.colors.aquaLight,
+    backgroundColor: colors.aquaLight,
     borderWidth: 1,
-    borderColor: THEME.colors.aqua,
+    borderColor: colors.aqua,
     borderRadius: 18,
     padding: 14,
     alignItems: 'center',
   },
   graduateBtnHighlighted: {
-    backgroundColor: THEME.colors.limaLight,
-    borderColor: THEME.colors.lima,
+    backgroundColor: colors.limaLight,
+    borderColor: colors.lima,
   },
   graduateBtnText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 14,
-    color: THEME.colors.aquaDark,
+    color: colors.aquaDark,
   },
   graduateBtnSub: {
     fontFamily: THEME.fonts.regular,
     fontSize: 11,
-    color: THEME.colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     marginTop: 4,
   },
@@ -916,7 +905,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     paddingVertical: 12,
     paddingHorizontal: 10,
     borderRadius: 14,
@@ -924,12 +913,12 @@ const styles = StyleSheet.create({
   actionPillText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
   gentleQuote: {
     fontFamily: THEME.fonts.regular,
     fontSize: 12,
-    color: THEME.colors.outline,
+    color: colors.outline,
     fontStyle: 'italic',
     textAlign: 'center',
     paddingHorizontal: 16,

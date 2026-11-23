@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -23,35 +23,10 @@ import {
   Moon,
   Check,
 } from 'lucide-react-native';
-import { THEME } from '../theme/colors';
+import { THEME, ThemeColors } from '../theme/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useTranslation, formatText } from '../i18n/translations';
 import { useHabitStore } from '../store/habitStore';
-
-const TIME_PRESETS = [
-  {
-    time: '08:30',
-    title: 'Con el desayuno',
-    sub: 'Ideal para arrancar en calma',
-    bg: THEME.colors.lima,
-    iconColor: THEME.colors.limaDark,
-    icon: 'coffee' as const,
-  },
-  {
-    time: '18:00',
-    title: 'Tarde tranquila',
-    sub: 'Para cerrar la jornada',
-    bg: THEME.colors.aqua,
-    iconColor: THEME.colors.aquaDark,
-    icon: 'leaf' as const,
-  },
-  {
-    time: '21:30',
-    title: 'Antes de dormir',
-    sub: 'Momento de desconexión',
-    bg: THEME.colors.coralLight,
-    iconColor: THEME.colors.coralDark,
-    icon: 'moon' as const,
-  },
-];
 
 export const OnboardingScreen: React.FC = () => {
   const [step, setStep] = useState<number>(1);
@@ -62,9 +37,34 @@ export const OnboardingScreen: React.FC = () => {
   const [revelationStep, setRevelationStep] = useState<number>(1);
 
   const { createInitialHabit } = useHabitStore();
+  const { colors } = useAppTheme();
+  const { t, language } = useTranslation();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const TIME_PRESETS = [
+    {
+      ...t.onboarding.presets[0],
+      bg: colors.lima,
+      iconColor: colors.limaDark,
+      icon: 'coffee' as const,
+    },
+    {
+      ...t.onboarding.presets[1],
+      bg: colors.aqua,
+      iconColor: colors.aquaDark,
+      icon: 'leaf' as const,
+    },
+    {
+      ...t.onboarding.presets[2],
+      bg: colors.coralLight,
+      iconColor: colors.coralDark,
+      icon: 'moon' as const,
+    },
+  ];
 
   const handleFinish = async () => {
-    const finalName = habitName.trim() || 'Caminar 15 min';
+    const fallback = language === 'en' ? 'Walk 15 min' : 'Caminar 15 min';
+    const finalName = habitName.trim() || fallback;
     await createInitialHabit(finalName, selectedColor, anchorText, reminderTime);
   };
 
@@ -90,12 +90,14 @@ export const OnboardingScreen: React.FC = () => {
             <View style={styles.progressHeader}>
               <View style={styles.progressTopRow}>
                 <View style={styles.stepLabelRow}>
-                  <Sprout size={15} color={THEME.colors.coral} />
-                  <Text style={styles.badgeStep}>Paso {step - 1} de 4</Text>
+                  <Sprout size={15} color={colors.coral} />
+                  <Text style={styles.badgeStep}>
+                    {formatText(t.onboarding.stepOf, { step: step - 1 })}
+                  </Text>
                 </View>
                 <View style={styles.statusChip}>
                   <Text style={styles.statusChipText}>
-                    {step === 4 ? 'Casi listos' : 'Tu ritmo'}
+                    {step === 4 ? t.onboarding.almostReady : t.onboarding.yourPace}
                   </Text>
                 </View>
               </View>
@@ -111,24 +113,24 @@ export const OnboardingScreen: React.FC = () => {
               <View style={styles.centerHero}>
                 <View style={styles.heroBubble}>
                   <Image
-                    source={require('../../assets/icon.png')}
+                    source={require('../../assets/logo.png')}
                     style={styles.heroLogo}
                     resizeMode="contain"
                   />
                 </View>
-                <View style={styles.brandTag}>
-                  <Text style={styles.brandTagText}>APILANDO ANDO</Text>
-                </View>
-                <Text style={styles.title}>Construí constancia sin presiones</Text>
+                <Text style={styles.brandTitle}>
+                  Apilando <Text style={styles.brandTitleAccent}>Ando</Text>
+                </Text>
+                <Text style={styles.title}>{t.onboarding.heroSubtitle}</Text>
                 <Text style={styles.paragraph}>
-                  Los hábitos no se construyen de golpe.{'\n'}
-                  Se construyen de a uno, despacio, sin prisa.{'\n\n'}
-                  <Text style={styles.boldText}>Acá vas a empezar por el primero.</Text>
+                  {t.onboarding.heroP1}{'\n'}
+                  {t.onboarding.heroP2}{'\n\n'}
+                  <Text style={styles.boldText}>{t.onboarding.heroP3}</Text>
                 </Text>
               </View>
 
               <TouchableOpacity style={styles.primaryButton} onPress={() => setStep(2)}>
-                <Text style={styles.primaryButtonText}>Empezar</Text>
+                <Text style={styles.primaryButtonText}>{t.onboarding.startBtn}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -137,22 +139,20 @@ export const OnboardingScreen: React.FC = () => {
           {step === 2 && (
             <View style={styles.contentBetween}>
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.heading}>¿Qué hábito querés empezar a construir?</Text>
-                <Text style={styles.subheading}>
-                  Elegí una acción pequeña y posible todos los días.
-                </Text>
+                <Text style={styles.heading}>{t.onboarding.step2Title}</Text>
+                <Text style={styles.subheading}>{t.onboarding.step2Sub}</Text>
 
                 <View style={styles.cardBox}>
                   <TextInput
                     style={styles.input}
-                    placeholder="Ej. Leer 10 minutos, Tomar agua..."
-                    placeholderTextColor={THEME.colors.outline}
+                    placeholder={t.onboarding.step2Placeholder}
+                    placeholderTextColor={colors.outline}
                     value={habitName}
                     onChangeText={setHabitName}
                   />
 
                   <View style={styles.chipRow}>
-                    {['Leer 10 min', 'Caminar 15 min', 'Beber agua', 'Meditar 5 min'].map((sug) => (
+                    {t.onboarding.step2Suggestions.map((sug) => (
                       <TouchableOpacity
                         key={sug}
                         style={[styles.chip, habitName === sug && styles.chipActive]}
@@ -180,7 +180,7 @@ export const OnboardingScreen: React.FC = () => {
                         onPress={() => setSelectedColor(c.hex)}
                       >
                         {selectedColor === c.hex && (
-                          <Check size={18} color={THEME.colors.dark} strokeWidth={3} />
+                          <Check size={18} color={colors.dark} strokeWidth={3} />
                         )}
                       </TouchableOpacity>
                     ))}
@@ -198,9 +198,9 @@ export const OnboardingScreen: React.FC = () => {
           {step === 3 && (
             <View style={styles.contentBetween}>
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.heading}>¿A qué momento de tu día lo podés enganchar?</Text>
+                <Text style={styles.heading}>¿A qué momento del día lo podés enganchar?</Text>
                 <Text style={styles.subheading}>
-                  Los hábitos nuevos se instalan mejor cuando los atás a algo que ya hacés en
+                  Los hábitos nuevos se instalan mejor cuando los anclás a algo que ya hacés en
                   automático.
                 </Text>
 
@@ -208,7 +208,7 @@ export const OnboardingScreen: React.FC = () => {
                   <TextInput
                     style={styles.input}
                     placeholder="Ej. Después del café, antes de dormir..."
-                    placeholderTextColor={THEME.colors.outline}
+                    placeholderTextColor={colors.outline}
                     value={anchorText}
                     onChangeText={setAnchorText}
                   />
@@ -269,7 +269,7 @@ export const OnboardingScreen: React.FC = () => {
                         style={styles.timeStepBtn}
                         onPress={() => adjustHour(-1)}
                       >
-                        <ChevronDown size={20} color={THEME.colors.dark} />
+                        <ChevronDown size={20} color={colors.dark} />
                       </TouchableOpacity>
 
                       <TextInput
@@ -284,12 +284,12 @@ export const OnboardingScreen: React.FC = () => {
                         style={styles.timeStepBtn}
                         onPress={() => adjustHour(1)}
                       >
-                        <ChevronUp size={20} color={THEME.colors.dark} />
+                        <ChevronUp size={20} color={colors.dark} />
                       </TouchableOpacity>
                     </View>
 
                     <View style={styles.reminderStatusPill}>
-                      <Bell size={13} color={THEME.colors.coral} />
+                      <Bell size={13} color={colors.coral} />
                       <Text style={styles.reminderStatusText}>Recordatorio diario activado</Text>
                     </View>
                   </View>
@@ -343,11 +343,11 @@ export const OnboardingScreen: React.FC = () => {
               <View style={styles.centerHero}>
                 {revelationStep === 1 && (
                   <View style={[styles.ruleCard, styles.ruleCardLima]}>
-                    <View style={[styles.ruleIconCircle, { backgroundColor: THEME.colors.lima }]}>
-                      <Sprout size={28} color={THEME.colors.limaDark} />
+                    <View style={[styles.ruleIconCircle, { backgroundColor: colors.lima }]}>
+                      <Sprout size={28} color={colors.limaDark} />
                     </View>
-                    <View style={[styles.ruleBadgePill, { backgroundColor: THEME.colors.lima }]}>
-                      <Text style={[styles.ruleBadgeText, { color: THEME.colors.limaDark }]}>
+                    <View style={[styles.ruleBadgePill, { backgroundColor: colors.lima }]}>
+                      <Text style={[styles.ruleBadgeText, { color: colors.limaDark }]}>
                         REGLA 1 DE 3 · 🌱 FOCO PLENO
                       </Text>
                     </View>
@@ -365,12 +365,12 @@ export const OnboardingScreen: React.FC = () => {
                 {revelationStep === 2 && (
                   <View style={[styles.ruleCard, styles.ruleCardCoral]}>
                     <View
-                      style={[styles.ruleIconCircle, { backgroundColor: THEME.colors.coralLight }]}
+                      style={[styles.ruleIconCircle, { backgroundColor: colors.coralLight }]}
                     >
-                      <Shield size={28} color={THEME.colors.coral} />
+                      <Shield size={28} color={colors.coral} />
                     </View>
-                    <View style={[styles.ruleBadgePill, { backgroundColor: THEME.colors.coral }]}>
-                      <Text style={[styles.ruleBadgeText, { color: THEME.colors.white }]}>
+                    <View style={[styles.ruleBadgePill, { backgroundColor: colors.coral }]}>
+                      <Text style={[styles.ruleBadgeText, { color: colors.white }]}>
                         REGLA 2 DE 3 · 🛡️ 2 DISPONIBLES
                       </Text>
                     </View>
@@ -385,11 +385,11 @@ export const OnboardingScreen: React.FC = () => {
 
                 {revelationStep === 3 && (
                   <View style={[styles.ruleCard, styles.ruleCardAqua]}>
-                    <View style={[styles.ruleIconCircle, { backgroundColor: THEME.colors.aqua }]}>
-                      <Calendar size={28} color={THEME.colors.aquaDark} />
+                    <View style={[styles.ruleIconCircle, { backgroundColor: colors.aqua }]}>
+                      <Calendar size={28} color={colors.aquaDark} />
                     </View>
-                    <View style={[styles.ruleBadgePill, { backgroundColor: THEME.colors.aqua }]}>
-                      <Text style={[styles.ruleBadgeText, { color: THEME.colors.aquaDark }]}>
+                    <View style={[styles.ruleBadgePill, { backgroundColor: colors.aqua }]}>
+                      <Text style={[styles.ruleBadgeText, { color: colors.aquaDark }]}>
                         REGLA 3 DE 3 · 🌿 MANTENIMIENTO
                       </Text>
                     </View>
@@ -406,7 +406,7 @@ export const OnboardingScreen: React.FC = () => {
               <TouchableOpacity
                 style={[
                   styles.primaryButton,
-                  revelationStep === 3 && { backgroundColor: THEME.colors.coral },
+                  revelationStep === 3 && { backgroundColor: colors.coral },
                 ]}
                 onPress={() => {
                   if (revelationStep < 3) {
@@ -432,10 +432,11 @@ export const OnboardingScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: THEME.colors.cream,
+    backgroundColor: colors.cream,
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 0,
   },
   container: {
@@ -467,12 +468,12 @@ const styles = StyleSheet.create({
   badgeStep: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.coral,
+    color: colors.coral,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   statusChip: {
-    backgroundColor: THEME.colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: THEME.radius.full,
@@ -480,17 +481,17 @@ const styles = StyleSheet.create({
   statusChipText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
   progressTrack: {
     height: 6,
-    backgroundColor: THEME.colors.surfaceHigh,
+    backgroundColor: colors.surfaceHigh,
     borderRadius: 99,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: THEME.colors.coral,
+    backgroundColor: colors.coral,
     borderRadius: 99,
   },
   contentBetween: {
@@ -507,9 +508,9 @@ const styles = StyleSheet.create({
     width: 92,
     height: 92,
     borderRadius: 46,
-    backgroundColor: THEME.colors.limaLight,
+    backgroundColor: colors.limaLight,
     borderWidth: 2,
-    borderColor: THEME.colors.lima,
+    borderColor: colors.lima,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 18,
@@ -518,36 +519,34 @@ const styles = StyleSheet.create({
     fontSize: 44,
   },
   heroLogo: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
+    width: 72,
+    height: 72,
   },
-  brandTag: {
-    backgroundColor: THEME.colors.aquaLight,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: THEME.radius.full,
-    marginBottom: 10,
+  brandTitle: {
+    fontFamily: THEME.fonts.bold,
+    fontSize: 32,
+    lineHeight: 38,
+    color: colors.dark,
+    letterSpacing: -0.7,
+    textAlign: 'center',
+    marginBottom: 8,
   },
-  brandTagText: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 11,
-    color: THEME.colors.aquaDark,
-    letterSpacing: 1,
+  brandTitleAccent: {
+    color: colors.coral,
   },
   title: {
     fontFamily: THEME.fonts.medium,
-    fontSize: 28,
-    color: THEME.colors.dark,
+    fontSize: 22,
+    color: colors.dark,
     marginBottom: THEME.spacing.md,
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
     textAlign: 'center',
-    lineHeight: 35,
+    lineHeight: 29,
   },
   paragraph: {
     fontFamily: THEME.fonts.regular,
     fontSize: 15,
-    color: THEME.colors.muted,
+    color: colors.muted,
     lineHeight: 23,
     textAlign: 'center',
     paddingHorizontal: 12,
@@ -555,18 +554,18 @@ const styles = StyleSheet.create({
   paragraphCenter: {
     fontFamily: THEME.fonts.regular,
     fontSize: 14,
-    color: THEME.colors.muted,
+    color: colors.muted,
     lineHeight: 22,
     textAlign: 'center',
   },
   boldText: {
     fontFamily: THEME.fonts.semibold,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   heading: {
     fontFamily: THEME.fonts.medium,
     fontSize: 26,
-    color: THEME.colors.dark,
+    color: colors.dark,
     marginBottom: 6,
     lineHeight: 33,
     letterSpacing: -0.3,
@@ -574,35 +573,35 @@ const styles = StyleSheet.create({
   headingCenter: {
     fontFamily: THEME.fonts.medium,
     fontSize: 22,
-    color: THEME.colors.dark,
+    color: colors.dark,
     marginBottom: 10,
     textAlign: 'center',
   },
   subheading: {
     fontFamily: THEME.fonts.regular,
     fontSize: 14,
-    color: THEME.colors.muted,
+    color: colors.muted,
     lineHeight: 20,
     marginBottom: 18,
   },
   cardBox: {
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 24,
     padding: 16,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     marginBottom: 16,
   },
   input: {
     fontFamily: THEME.fonts.regular,
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: THEME.colors.dark,
+    color: colors.dark,
     marginBottom: 14,
   },
   chipRow: {
@@ -612,30 +611,30 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   chip: {
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: THEME.radius.full,
   },
   chipActive: {
-    backgroundColor: THEME.colors.lima,
-    borderColor: THEME.colors.lima,
+    backgroundColor: colors.lima,
+    borderColor: colors.lima,
   },
   chipText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   chipTextActive: {
     fontFamily: THEME.fonts.semibold,
-    color: THEME.colors.limaDark,
+    color: colors.limaDark,
   },
   sectionLabel: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.outline,
+    color: colors.outline,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 10,
@@ -653,12 +652,12 @@ const styles = StyleSheet.create({
   },
   colorCircleSelected: {
     borderWidth: 3,
-    borderColor: THEME.colors.dark,
+    borderColor: colors.dark,
   },
   timeDisplayCard: {
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 14,
@@ -668,7 +667,7 @@ const styles = StyleSheet.create({
   timeOverline: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 10,
-    color: THEME.colors.outline,
+    color: colors.outline,
     letterSpacing: 0.9,
     marginBottom: 6,
   },
@@ -682,7 +681,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: THEME.colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -692,14 +691,14 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     textAlign: 'center',
     fontSize: 40,
-    color: THEME.colors.coral,
+    color: colors.coral,
     paddingVertical: 4,
   },
   reminderStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: THEME.colors.aquaLight,
+    backgroundColor: colors.aquaLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: THEME.radius.full,
@@ -708,12 +707,12 @@ const styles = StyleSheet.create({
   reminderStatusText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: THEME.colors.aquaDark,
+    color: colors.aquaDark,
   },
   presetsLabel: {
     fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: THEME.colors.muted,
+    color: colors.muted,
     marginBottom: 10,
   },
   presetsList: {
@@ -723,15 +722,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
     borderColor: 'transparent',
   },
   presetRowSelected: {
-    borderColor: THEME.colors.coral,
-    backgroundColor: THEME.colors.surfaceContainer,
+    borderColor: colors.coral,
+    backgroundColor: colors.surfaceContainer,
   },
   presetLeft: {
     flexDirection: 'row',
@@ -749,17 +748,17 @@ const styles = StyleSheet.create({
   presetTitle: {
     fontFamily: THEME.fonts.medium,
     fontSize: 14,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   presetSub: {
     fontFamily: THEME.fonts.regular,
     fontSize: 11,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
   presetTimePill: {
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: THEME.radius.full,
@@ -767,24 +766,24 @@ const styles = StyleSheet.create({
   presetTimeText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 12,
-    color: THEME.colors.coral,
+    color: colors.coral,
   },
   ruleCard: {
     width: '100%',
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 28,
     padding: 24,
     alignItems: 'center',
     borderWidth: 2,
   },
   ruleCardLima: {
-    borderColor: THEME.colors.lima,
+    borderColor: colors.lima,
   },
   ruleCardCoral: {
     borderColor: '#F5C4BC',
   },
   ruleCardAqua: {
-    borderColor: THEME.colors.aqua,
+    borderColor: colors.aqua,
   },
   ruleIconCircle: {
     width: 64,
@@ -806,11 +805,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   primaryButton: {
-    backgroundColor: THEME.colors.coral,
+    backgroundColor: colors.coral,
     paddingVertical: 16,
     borderRadius: THEME.radius.full,
     alignItems: 'center',
-    shadowColor: THEME.colors.coral,
+    shadowColor: colors.coral,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -818,7 +817,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontFamily: THEME.fonts.semibold,
-    color: THEME.colors.white,
+    color: colors.white,
     fontSize: 16,
   },
   textButton: {
@@ -829,6 +828,6 @@ const styles = StyleSheet.create({
   textButtonText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
 });

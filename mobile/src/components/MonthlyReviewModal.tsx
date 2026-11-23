@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,29 +8,41 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { THEME } from '../theme/colors';
+import { THEME, ThemeColors } from '../theme/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useTranslation, formatText } from '../i18n/translations';
 import { Habit, DailyLog } from '../types/habit';
 
-interface MonthlyReviewModalProps {
-  visible: boolean;
-  onClose: () => void;
+interface MonthlyReviewContentProps {
   habits: Habit[];
   logs: Record<string, DailyLog>;
   onPromoteAndAddHabit: (habit: Habit) => void;
+  embedded?: boolean;
+  onClose?: () => void;
+  onContinueFocus?: () => void;
 }
 
-export const MonthlyReviewModal: React.FC<MonthlyReviewModalProps> = ({
-  visible,
-  onClose,
+interface MonthlyReviewModalProps extends MonthlyReviewContentProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+export const MonthlyReviewContent: React.FC<MonthlyReviewContentProps> = ({
   habits,
   logs,
   onPromoteAndAddHabit,
+  embedded = false,
+  onClose,
+  onContinueFocus,
 }) => {
+  const { colors, shadows } = useAppTheme();
+  const { t, locale } = useTranslation();
+  const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
+
   const now = new Date();
-  const monthName = now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  const monthName = now.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
-  // Calcular constancia en los últimos 30 días
   const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const monthLogs = Object.values(logs).filter((l) => l.date.startsWith(currentMonthPrefix));
 
@@ -51,309 +63,347 @@ export const MonthlyReviewModal: React.FC<MonthlyReviewModalProps> = ({
 
   const canPromote = activeHabit && activeHabit.currentStreak >= 21;
 
+  const handleContinue = () => {
+    if (onContinueFocus) {
+      onContinueFocus();
+    } else if (onClose) {
+      onClose();
+    }
+  };
+
+  return (
+    <View style={embedded ? styles.embeddedContainer : undefined}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.badgeText}>{t.monthly.kicker}</Text>
+          <Text style={styles.title}>
+            {formatText(t.monthly.title, { month: capitalizedMonth })}
+          </Text>
+        </View>
+        {!embedded && onClose && (
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <Text style={styles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        {/* BALANCE VISUAL DE CONSTANCIA */}
+        <View style={styles.statsCard}>
+          <Text style={styles.statsGreeting}>{t.monthly.greeting}</Text>
+          <Text style={styles.statsDescription}>{t.monthly.description}</Text>
+
+          <View style={styles.metricsRow}>
+            <View style={styles.metricBox}>
+              <Text style={styles.metricNumber}>{totalActiveDays}</Text>
+              <Text style={styles.metricLabel}>{t.monthly.activeDays}</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricBox}>
+              <Text style={styles.metricNumber}>{totalShieldedDays}</Text>
+              <Text style={styles.metricLabel}>{t.monthly.shieldedDays}</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricBox}>
+              <Text style={styles.metricNumber}>{maintenanceCount + anchorCount}</Text>
+              <Text style={styles.metricLabel}>{t.monthly.consolidated}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* SITUACIÓN DEL HÁBITO ACTIVO */}
+        {activeHabit ? (
+          <View style={styles.activeReviewBox}>
+            <View style={styles.activeHeaderRow}>
+              <Text style={styles.activeTag}>{t.monthly.focusTag}</Text>
+              <Text style={styles.activeStreakText}>
+                {formatText(t.monthly.streakDays, { count: activeHabit.currentStreak })}
+              </Text>
+            </View>
+            <Text style={styles.activeName}>{activeHabit.name}</Text>
+            {activeHabit.anchorText && (
+              <Text style={styles.activeAnchor}>↳ {activeHabit.anchorText}</Text>
+            )}
+
+            {/* DECISIÓN SEGÚN LOS 21 DÍAS */}
+            {canPromote ? (
+              <View style={styles.decisionPass}>
+                <Text style={styles.decisionTitle}>{t.monthly.readyTitle}</Text>
+                <Text style={styles.decisionText}>{t.monthly.readyText}</Text>
+
+                <TouchableOpacity
+                  style={styles.promoteBtn}
+                  onPress={() => {
+                    onClose?.();
+                    onPromoteAndAddHabit(activeHabit);
+                  }}
+                >
+                  <Text style={styles.promoteBtnText}>{t.monthly.promoteBtn}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.decisionPedagogy}>
+                <Text style={styles.pedagogyTitle}>{t.monthly.pedagogyTitle}</Text>
+                <Text style={styles.pedagogyText}>
+                  {formatText(t.monthly.pedagogyText, {
+                    count: activeHabit.currentStreak,
+                    name: activeHabit.name,
+                  })}
+                </Text>
+                <TouchableOpacity style={styles.pedagogyBtn} onPress={handleContinue}>
+                  <Text style={styles.pedagogyBtnText}>{t.monthly.continueBtn}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.activeReviewBox}>
+            <Text style={styles.activeTag}>{t.monthly.allConsolidatedTag}</Text>
+            <Text style={styles.activeName}>{t.monthly.allConsolidatedTitle}</Text>
+            <Text style={styles.pedagogyText}>{t.monthly.allConsolidatedSub}</Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+};
+
+export const MonthlyReviewModal: React.FC<MonthlyReviewModalProps> = ({
+  visible,
+  onClose,
+  habits,
+  logs,
+  onPromoteAndAddHabit,
+}) => {
+  const { colors, shadows } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.sheetContainer}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.badgeText}>RITUAL DE CIERRE</Text>
-              <Text style={styles.title}>Revisión de {capitalizedMonth}</Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-            {/* BALANCE VISUAL DE CONSTANCIA */}
-            <View style={styles.statsCard}>
-              <Text style={styles.statsGreeting}>✨ Tu balance amable del mes</Text>
-              <Text style={styles.statsDescription}>
-                La constancia real no es la perfección, sino volver día tras día.
-              </Text>
-
-              <View style={styles.metricsRow}>
-                <View style={styles.metricBox}>
-                  <Text style={styles.metricNumber}>{totalActiveDays}</Text>
-                  <Text style={styles.metricLabel}>Días activos</Text>
-                </View>
-                <View style={styles.metricDivider} />
-                <View style={styles.metricBox}>
-                  <Text style={styles.metricNumber}>{totalShieldedDays}</Text>
-                  <Text style={styles.metricLabel}>🛡️ Protegidos</Text>
-                </View>
-                <View style={styles.metricDivider} />
-                <View style={styles.metricBox}>
-                  <Text style={styles.metricNumber}>{maintenanceCount + anchorCount}</Text>
-                  <Text style={styles.metricLabel}>Consolidados</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* SITUACIÓN DEL HÁBITO ACTIVO */}
-            {activeHabit ? (
-              <View style={styles.activeReviewBox}>
-                <View style={styles.activeHeaderRow}>
-                  <Text style={styles.activeTag}>HÁBITO EN FOCO 🌱</Text>
-                  <Text style={styles.activeStreakText}>🔥 {activeHabit.currentStreak} días seguidos</Text>
-                </View>
-                <Text style={styles.activeName}>{activeHabit.name}</Text>
-                {activeHabit.anchorText && (
-                  <Text style={styles.activeAnchor}>↳ {activeHabit.anchorText}</Text>
-                )}
-
-                {/* DECISIÓN SEGÚN LOS 21 DÍAS */}
-                {canPromote ? (
-                  <View style={styles.decisionPass}>
-                    <Text style={styles.decisionTitle}>🎉 ¡Listo para abrir un nuevo camino!</Text>
-                    <Text style={styles.decisionText}>
-                      Tu hábito ya superó los 21 días. Ha echado raíces suficientes como para pasar
-                      a Mantenimiento y dar la bienvenida a tu próximo hábito activo.
-                    </Text>
-
-                    <TouchableOpacity
-                      style={styles.promoteBtn}
-                      onPress={() => {
-                        onClose();
-                        onPromoteAndAddHabit(activeHabit);
-                      }}
-                    >
-                      <Text style={styles.promoteBtnText}>
-                        Consolidar y sumar hábito para el mes que entra 🌿
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.decisionPedagogy}>
-                    <Text style={styles.pedagogyTitle}>🌱 Un paso a la vez (filosofía sin culpa)</Text>
-                    <Text style={styles.pedagogyText}>
-                      Llevás {activeHabit.currentStreak} días con "{activeHabit.name}". El cerebro necesita al
-                      menos 21 días para que una conducta pase a modo automático.
-                      {'\n\n'}
-                      Agregar otro hábito ahora dividiría tu energía. El mes que viene, cuando este ya
-                      sea natural, abriremos la puerta para el siguiente.
-                    </Text>
-                    <TouchableOpacity style={styles.pedagogyBtn} onPress={onClose}>
-                      <Text style={styles.pedagogyBtnText}>Seguir consolidando con calma 🌱</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            ) : (
-              <View style={styles.activeReviewBox}>
-                <Text style={styles.activeTag}>🌿 RUTINA EN CURSO</Text>
-                <Text style={styles.activeName}>Todos tus hábitos están consolidados</Text>
-                <Text style={styles.pedagogyText}>
-                  Podés sumar un nuevo hábito activo desde tu Dashboard en cualquier momento.
-                </Text>
-              </View>
-            )}
-          </ScrollView>
+          <MonthlyReviewContent
+            habits={habits}
+            logs={logs}
+            onPromoteAndAddHabit={onPromoteAndAddHabit}
+            onClose={onClose}
+          />
         </View>
       </View>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(45, 49, 46, 0.55)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
-    backgroundColor: THEME.colors.cream,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 24,
-    paddingHorizontal: THEME.spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
-    maxHeight: '92%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  badgeText: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 11,
-    color: THEME.colors.terracotta,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  title: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 21,
-    color: THEME.colors.dark,
-  },
-  closeBtn: {
-    padding: 8,
-    backgroundColor: THEME.colors.white,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  closeBtnText: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 14,
-    color: THEME.colors.muted,
-  },
-  content: {
-    paddingBottom: 24,
-  },
-  statsCard: {
-    backgroundColor: THEME.colors.white,
-    borderRadius: THEME.radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: 16,
-  },
-  statsGreeting: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 15,
-    color: THEME.colors.dark,
-    marginBottom: 2,
-  },
-  statsDescription: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 12,
-    color: THEME.colors.muted,
-    lineHeight: 16,
-    marginBottom: 14,
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    backgroundColor: THEME.colors.sandLight,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 12,
-  },
-  metricBox: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  metricNumber: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 19,
-    color: THEME.colors.dark,
-  },
-  metricLabel: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 10,
-    color: THEME.colors.muted,
-    marginTop: 2,
-  },
-  metricDivider: {
-    width: 1,
-    backgroundColor: THEME.colors.border,
-    height: '60%',
-    alignSelf: 'center',
-  },
-  activeReviewBox: {
-    backgroundColor: THEME.colors.white,
-    borderRadius: THEME.radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  activeHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  activeTag: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 10,
-    color: THEME.colors.sage,
-    textTransform: 'uppercase',
-  },
-  activeStreakText: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 12,
-    color: THEME.colors.dark,
-  },
-  activeName: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 18,
-    color: THEME.colors.dark,
-  },
-  activeAnchor: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 12,
-    color: THEME.colors.muted,
-    marginTop: 2,
-    marginBottom: 12,
-  },
-  decisionPass: {
-    backgroundColor: THEME.colors.sageLight,
-    padding: 14,
-    borderRadius: THEME.radius.md,
-    marginTop: 10,
-  },
-  decisionTitle: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 13,
-    color: THEME.colors.dark,
-    marginBottom: 4,
-  },
-  decisionText: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 12,
-    color: THEME.colors.dark,
-    lineHeight: 17,
-    marginBottom: 12,
-  },
-  promoteBtn: {
-    backgroundColor: THEME.colors.coral,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: THEME.radius.full,
-    alignItems: 'center',
-  },
-  promoteBtnText: {
-    fontFamily: THEME.fonts.semibold,
-    color: '#FFF',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  decisionPedagogy: {
-    backgroundColor: THEME.colors.lightGray,
-    padding: 14,
-    borderRadius: THEME.radius.md,
-    marginTop: 10,
-  },
-  pedagogyTitle: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 13,
-    color: THEME.colors.dark,
-    marginBottom: 4,
-  },
-  pedagogyText: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 12,
-    color: THEME.colors.dark,
-    lineHeight: 17,
-    marginBottom: 12,
-  },
-  pedagogyBtn: {
-    backgroundColor: THEME.colors.white,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    paddingVertical: 10,
-    borderRadius: THEME.radius.full,
-    alignItems: 'center',
-  },
-  pedagogyBtnText: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 12,
-    color: THEME.colors.dark,
-  },
-});
+const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppTheme>['shadows']) =>
+  StyleSheet.create({
+    embeddedContainer: {
+      flex: 1,
+      width: '100%',
+      maxWidth: 480,
+      alignSelf: 'center',
+      backgroundColor: colors.cream,
+      paddingTop: THEME.spacing.md,
+      paddingHorizontal: THEME.spacing.md,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(18, 30, 28, 0.55)',
+      justifyContent: 'flex-end',
+    },
+    sheetContainer: {
+      width: '100%',
+      maxWidth: 480,
+      alignSelf: 'center',
+      backgroundColor: colors.cream,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingTop: 24,
+      paddingHorizontal: THEME.spacing.lg,
+      paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+      maxHeight: '92%',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 20,
+    },
+    badgeText: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 11,
+      color: colors.terracotta,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 8,
+    },
+    title: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 21,
+      color: colors.dark,
+    },
+    closeBtn: {
+      padding: 8,
+      backgroundColor: colors.white,
+      borderRadius: THEME.radius.full,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    closeBtnText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 14,
+      color: colors.muted,
+    },
+    content: {
+      paddingBottom: 24,
+    },
+    statsCard: {
+      backgroundColor: colors.white,
+      borderRadius: THEME.radius.lg,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 16,
+      ...shadows.card,
+    },
+    statsGreeting: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 15,
+      color: colors.dark,
+      marginBottom: 6,
+    },
+    statsDescription: {
+      fontFamily: THEME.fonts.regular,
+      fontSize: 12,
+      color: colors.muted,
+      lineHeight: 16,
+      marginBottom: 14,
+    },
+    metricsRow: {
+      flexDirection: 'row',
+      backgroundColor: colors.sandLight,
+      borderRadius: THEME.radius.md,
+      paddingVertical: 12,
+    },
+    metricBox: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    metricNumber: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 19,
+      color: colors.dark,
+    },
+    metricLabel: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 10,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    metricDivider: {
+      width: 1,
+      backgroundColor: colors.border,
+      height: '60%',
+      alignSelf: 'center',
+    },
+    activeReviewBox: {
+      backgroundColor: colors.white,
+      borderRadius: THEME.radius.lg,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...shadows.card,
+    },
+    activeHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    activeTag: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 10,
+      color: colors.sage,
+      textTransform: 'uppercase',
+    },
+    activeStreakText: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 12,
+      color: colors.dark,
+    },
+    activeName: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 18,
+      color: colors.dark,
+    },
+    activeAnchor: {
+      fontFamily: THEME.fonts.regular,
+      fontSize: 12,
+      color: colors.muted,
+      marginTop: 6,
+      marginBottom: 16,
+    },
+    decisionPass: {
+      backgroundColor: colors.sageLight,
+      padding: 14,
+      borderRadius: THEME.radius.md,
+      marginTop: 10,
+    },
+    decisionTitle: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 13,
+      color: colors.dark,
+      marginBottom: 8,
+    },
+    decisionText: {
+      fontFamily: THEME.fonts.regular,
+      fontSize: 12,
+      color: colors.dark,
+      lineHeight: 17,
+      marginBottom: 12,
+    },
+    promoteBtn: {
+      backgroundColor: colors.coral,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: THEME.radius.full,
+      alignItems: 'center',
+    },
+    promoteBtnText: {
+      fontFamily: THEME.fonts.semibold,
+      color: '#FFFFFF',
+      fontSize: 13,
+      textAlign: 'center',
+    },
+    decisionPedagogy: {
+      backgroundColor: colors.lightGray,
+      padding: 14,
+      borderRadius: THEME.radius.md,
+      marginTop: 10,
+    },
+    pedagogyTitle: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 13,
+      color: colors.dark,
+      marginBottom: 8,
+    },
+    pedagogyText: {
+      fontFamily: THEME.fonts.regular,
+      fontSize: 12,
+      color: colors.dark,
+      lineHeight: 17,
+      marginBottom: 12,
+    },
+    pedagogyBtn: {
+      backgroundColor: colors.white,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 10,
+      borderRadius: THEME.radius.full,
+      alignItems: 'center',
+    },
+    pedagogyBtnText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 12,
+      color: colors.dark,
+    },
+  });

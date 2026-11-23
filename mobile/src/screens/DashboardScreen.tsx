@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,38 +8,37 @@ import {
   Platform,
   StatusBar,
   Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  Calendar,
-  Trophy,
   Shield,
   Settings,
-  Coffee,
   Anchor,
+  HelpCircle,
   Trees,
   Sprout,
   Check,
   Flame,
   Sparkles,
-  CornerDownRight,
   ChevronRight,
   Leaf,
 } from 'lucide-react-native';
-import { THEME } from '../theme/colors';
+import { THEME, ThemeColors } from '../theme/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useTranslation, formatText } from '../i18n/translations';
 import { useHabitStore } from '../store/habitStore';
 import { Habit, isEligibleForAnchorGraduation } from '../types/habit';
 import { triggerSuccessHaptic, triggerLightHaptic } from '../services/hapticService';
 import { MilestoneCelebrationData } from '../components/MilestoneCelebrationModal';
+import { ConfettiBurst } from '../components/ConfettiBurst';
 
 interface DashboardScreenProps {
   onOpenDetail: (habit: Habit) => void;
   onSimulateShield: () => void;
   onOpenAddHabit: () => void;
   onPromoteHabit: (habit: Habit) => void;
-  onOpenStickers: () => void;
   onOpenSettings: () => void;
-  onOpenMonthlyReview: () => void;
   onMilestoneReached?: (celebration: MilestoneCelebrationData) => void;
   pendingShieldCount?: number;
   onOpenPendingShields?: () => void;
@@ -50,14 +49,36 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onSimulateShield,
   onOpenAddHabit,
   onPromoteHabit,
-  onOpenStickers,
   onOpenSettings,
-  onOpenMonthlyReview,
   onMilestoneReached,
   pendingShieldCount = 0,
   onOpenPendingShields,
 }) => {
   const { habits, logs, toggleDayCompletion } = useHabitStore();
+  const { colors, shadows } = useAppTheme();
+  const { t, locale } = useTranslation();
+  const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
+  const [helpTopic, setHelpTopic] = useState<'anchor' | 'construction' | null>(null);
+  const [confettiKey, setConfettiKey] = useState(0);
+
+  const helpContent =
+    helpTopic === 'anchor'
+      ? {
+          icon: <Anchor size={20} color={colors.aquaDark} />,
+          iconBg: colors.aquaLight,
+          iconBorder: colors.aqua,
+          title: t.dashboard.anchorHelpTitle,
+          paragraphs: [t.dashboard.anchorHelpBody1, t.dashboard.anchorHelpBody2],
+        }
+      : helpTopic === 'construction'
+      ? {
+          icon: <Sprout size={20} color={colors.limaDark} />,
+          iconBg: colors.limaLight,
+          iconBorder: colors.lima,
+          title: t.dashboard.why21Title,
+          paragraphs: [t.dashboard.why21Body1, t.dashboard.why21Body2],
+        }
+      : null;
 
   const now = new Date();
   const year = now.getFullYear();
@@ -65,7 +86,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const day = String(now.getDate()).padStart(2, '0');
   const todayStr = `${year}-${month}-${day}`;
 
-  const formattedDate = now.toLocaleDateString('es-ES', {
+  const formattedDate = now.toLocaleDateString(locale, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -92,10 +113,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const totalDone =
     (activeHabit && isCompletedToday(activeHabit.id) ? 1 : 0) +
     maintenanceHabits.filter((m) => isCompletedToday(m.id)).length;
-  const completionPct = totalCheckable > 0 ? Math.round((totalDone / totalCheckable) * 100) : 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.mobileFrame}>
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           {/* HEADER: LOGO + NOMBRE DE LA APP Y ACCESOS EN UNA FILA LIMPIA */}
@@ -104,7 +124,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <View style={styles.headerBrandRow}>
                 <View style={styles.brandLogoWrap}>
                   <Image
-                    source={require('../../assets/icon.png')}
+                    source={require('../../assets/logo.png')}
                     style={styles.brandLogo}
                     resizeMode="contain"
                   />
@@ -116,38 +136,21 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </View>
 
               <View style={styles.topActions}>
-                <TouchableOpacity style={styles.iconCircleBtn} onPress={onOpenMonthlyReview}>
-                  <Calendar size={17} color={THEME.colors.muted} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconCircleBtn} onPress={onOpenStickers}>
-                  <Trophy size={17} color={THEME.colors.muted} />
-                </TouchableOpacity>
                 <TouchableOpacity style={styles.iconCircleBtn} onPress={onSimulateShield}>
-                  <Shield size={17} color={THEME.colors.muted} />
+                  <Shield size={17} color={colors.muted} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconCircleBtn} onPress={onOpenSettings}>
-                  <Settings size={17} color={THEME.colors.muted} />
+                  <Settings size={17} color={colors.muted} />
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.dateRow}>
               <Text style={styles.dateText}>{capitalizedDate}</Text>
-              <View style={styles.progressPill}>
-                <Leaf size={12} color={THEME.colors.limaDark} />
-                <Text style={styles.progressPillText}>
-                  {totalDone} de {totalCheckable} hoy ({completionPct}%)
-                </Text>
-              </View>
             </View>
 
             <View style={styles.greetingRow}>
-              <Text style={styles.greetingTitle}>Tu rutina de hoy</Text>
-              <View style={styles.ringBadge}>
-                <Text style={styles.ringBadgeText}>
-                  {totalDone}/{totalCheckable}
-                </Text>
-              </View>
+              <Text style={styles.greetingTitle}>{t.dashboard.routineTitle}</Text>
             </View>
           </View>
 
@@ -159,19 +162,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               onPress={onOpenPendingShields}
             >
               <View style={styles.pendingShieldIcon}>
-                <Shield size={16} color={THEME.colors.coral} />
+                <Shield size={16} color={colors.coral} />
               </View>
               <View style={styles.pendingShieldTextCol}>
                 <Text style={styles.pendingShieldTitle}>
                   {pendingShieldCount === 1
-                    ? 'Tenés 1 hábito de ayer pendiente de escudo'
-                    : `Tenés ${pendingShieldCount} hábitos de ayer pendientes de escudo`}
+                    ? t.dashboard.pendingShieldSingle
+                    : formatText(t.dashboard.pendingShieldMulti, { count: pendingShieldCount })}
                 </Text>
-                <Text style={styles.pendingShieldSub}>
-                  Tocá para decidir antes de las 23:59
-                </Text>
+                <Text style={styles.pendingShieldSub}>{t.dashboard.pendingShieldSub}</Text>
               </View>
-              <ChevronRight size={16} color={THEME.colors.coralDark} />
+              <ChevronRight size={16} color={colors.coralDark} />
             </TouchableOpacity>
           )}
 
@@ -193,7 +194,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   Cuando sientas que es momento, podés reanudarlo o archivarlo con paz.
                 </Text>
               </View>
-              <ChevronRight size={16} color={THEME.colors.aquaDark} />
+              <ChevronRight size={16} color={colors.aquaDark} />
             </TouchableOpacity>
           )}
 
@@ -205,15 +206,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             {activeHabit?.anchorText && (
               <View style={styles.stackRow}>
                 <View style={styles.nodeAnchor}>
-                  <Coffee size={18} color={THEME.colors.aquaDark} />
+                  <Anchor size={18} color={colors.aquaDark} />
                 </View>
                 <View style={styles.anchorCard}>
                   <View style={styles.anchorHeader}>
-                    <Anchor size={12} color={THEME.colors.aquaDark} />
-                    <Text style={styles.anchorTagText}>HÁBITO ANCLA</Text>
+                    <View style={styles.anchorPill}>
+                      <Text style={styles.anchorPillText}>{t.dashboard.anchorPill}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.anchorHelpBtn}
+                      onPress={() => setHelpTopic('anchor')}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel="Qué es un hábito ancla"
+                    >
+                      <HelpCircle size={18} color={colors.muted} />
+                    </TouchableOpacity>
                   </View>
                   <Text style={styles.anchorTitle}>{activeHabit.anchorText}</Text>
-                  <Text style={styles.anchorSub}>Disparador cotidiano establecido</Text>
                 </View>
               </View>
             )}
@@ -222,7 +231,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             {anchorHabits.map((a) => (
               <View key={a.id} style={styles.stackRow}>
                 <View style={styles.nodeGraduated}>
-                  <Trees size={17} color={THEME.colors.aquaDark} />
+                  <Trees size={17} color={colors.aquaDark} />
                 </View>
                 <TouchableOpacity
                   style={styles.graduatedCard}
@@ -231,15 +240,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 >
                   <View style={styles.cardHeader}>
                     <View style={styles.graduatedPill}>
-                      <Text style={styles.graduatedPillText}>🌳 Graduado</Text>
+                      <Text style={styles.graduatedPillText}>{t.dashboard.graduatedPill}</Text>
                     </View>
-                    <Text style={styles.integratedText}>✦ Integrado</Text>
+                    <Text style={styles.integratedText}>{t.dashboard.integrated}</Text>
                   </View>
                   <Text style={styles.habitTitle}>{a.name}</Text>
                   <View style={styles.metaInline}>
-                    <Sparkles size={13} color={THEME.colors.aquaDark} />
+                    <Sparkles size={13} color={colors.aquaDark} />
                     <Text style={styles.graduatedStreak}>
-                      {a.currentStreak} días de racha consolidada
+                      {formatText(t.dashboard.consolidatedStreak, { count: a.currentStreak })}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -253,7 +262,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               return (
                 <View key={m.id} style={styles.stackRow}>
                   <View style={styles.nodeMaintenance}>
-                    <Leaf size={17} color={THEME.colors.aquaDark} />
+                    <Leaf size={17} color={colors.aquaDark} />
                   </View>
                   <View style={styles.maintenanceCard}>
                     <TouchableOpacity
@@ -263,11 +272,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     >
                       <View style={styles.maintenancePillRow}>
                         <View style={styles.maintenancePill}>
-                          <Text style={styles.maintenancePillText}>🌿 Mantenimiento</Text>
+                          <Text style={styles.maintenancePillText}>{t.dashboard.maintenancePill}</Text>
                         </View>
                         {readyForAnchor && (
                           <View style={styles.anchorReadyPill}>
-                            <Text style={styles.anchorReadyPillText}>🌳 ¡6m! Graduar</Text>
+                            <Text style={styles.anchorReadyPillText}>{t.dashboard.graduate6m}</Text>
                           </View>
                         )}
                       </View>
@@ -275,19 +284,24 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                         {m.name}
                       </Text>
                       <View style={styles.metaInline}>
-                        <Flame size={13} color={THEME.colors.coral} />
-                        <Text style={styles.streakFlame}>{m.currentStreak} días continuos</Text>
+                        <Flame size={13} color={colors.coral} />
+                        <Text style={styles.streakFlame}>
+                          {formatText(t.dashboard.continuousDays, { count: m.currentStreak })}
+                        </Text>
                       </View>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       style={[styles.checkboxCircle, done && styles.checkboxCircleDone]}
                       onPress={() => {
+                        if (!done) {
+                          setConfettiKey((k) => k + 1);
+                        }
                         triggerLightHaptic();
                         toggleDayCompletion(m.id, todayStr);
                       }}
                     >
-                      {done && <Check size={19} color={THEME.colors.white} strokeWidth={2.8} />}
+                      {done && <Check size={19} color={colors.white} strokeWidth={2.8} />}
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -298,47 +312,30 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             {activeHabit && (
               <View style={styles.stackRow}>
                 <View style={styles.nodeActive}>
-                  <Sprout size={19} color={THEME.colors.limaDark} />
+                  <Sprout size={19} color={colors.limaDark} />
                 </View>
 
                 <View style={styles.activeCard}>
                   <View style={styles.cardHeader}>
                     <View style={styles.activePill}>
-                      <Text style={styles.activePillText}>🌱 En construcción</Text>
+                      <Text style={styles.activePillText}>{t.dashboard.constructionPill}</Text>
                     </View>
-                    <View style={styles.shieldsPill}>
-                      {[0, 1, 2].map((idx) => (
-                        <Shield
-                          key={idx}
-                          size={13}
-                          color={
-                            idx < activeHabit.shieldsAvailable
-                              ? THEME.colors.coral
-                              : THEME.colors.outline
-                          }
-                          fill={
-                            idx < activeHabit.shieldsAvailable ? THEME.colors.coral : 'transparent'
-                          }
-                        />
-                      ))}
-                      <Text style={styles.shieldsCount}>{activeHabit.shieldsAvailable}/3</Text>
-                    </View>
+                    <TouchableOpacity
+                      style={styles.anchorHelpBtn}
+                      onPress={() => setHelpTopic('construction')}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel={t.dashboard.why21Title}
+                    >
+                      <HelpCircle size={18} color={colors.muted} />
+                    </TouchableOpacity>
                   </View>
 
                   <TouchableOpacity activeOpacity={0.8} onPress={() => onOpenDetail(activeHabit)}>
-                    {activeHabit.anchorText && (
-                      <View style={styles.anchorLinkRow}>
-                        <CornerDownRight size={13} color={THEME.colors.coral} />
-                        <Text style={styles.activeAnchorText} numberOfLines={1}>
-                          Anclado a: {activeHabit.anchorText}
-                        </Text>
-                      </View>
-                    )}
                     <View style={styles.titleRow}>
                       <Text style={styles.activeHabitTitle}>{activeHabit.name}</Text>
                       <View style={styles.seeDetailPill}>
-                        <Text style={styles.seeDetailText}>Detalle</Text>
-                        <ChevronRight size={14} color={THEME.colors.aquaDark} />
+                        <Text style={styles.seeDetailText}>{t.dashboard.seeDetail}</Text>
+                        <ChevronRight size={14} color={colors.aquaDark} />
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -348,8 +345,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     <View style={styles.progressRowText}>
                       <Text style={styles.progressSub}>
                         {activeHabit.currentStreak >= 21
-                          ? '🎉 ¡21 días completados!'
-                          : `Día ${activeHabit.currentStreak} de 21 para consolidar`}
+                          ? t.dashboard.completed21
+                          : formatText(t.dashboard.daysToConsolidate, {
+                              count: activeHabit.currentStreak,
+                            })}
                       </Text>
                       <Text style={styles.progressPercent}>
                         {Math.min(100, Math.round((activeHabit.currentStreak / 21) * 100))}%
@@ -376,9 +375,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       style={styles.readyConsolidateBanner}
                       onPress={() => onPromoteHabit(activeHabit)}
                     >
-                      <Text style={styles.readyConsolidateTitle}>🌿 Listo para consolidar</Text>
+                      <Text style={styles.readyConsolidateTitle}>
+                        {t.dashboard.readyConsolidateTitle}
+                      </Text>
                       <Text style={styles.readyConsolidateSub}>
-                        Tocá acá para pasar a Mantenimiento y habilitar tu próximo hábito.
+                        {t.dashboard.readyConsolidateSub}
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -392,6 +393,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     activeOpacity={0.9}
                     onPress={async () => {
                       if (!isCompletedToday(activeHabit.id)) {
+                        setConfettiKey((k) => k + 1);
                         triggerSuccessHaptic();
                       } else {
                         triggerLightHaptic();
@@ -402,15 +404,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       }
                     }}
                   >
-                    <Check
-                      size={18}
-                      color={
-                        isCompletedToday(activeHabit.id)
-                          ? THEME.colors.limaDark
-                          : THEME.colors.white
-                      }
-                      strokeWidth={2.6}
-                    />
+                    {isCompletedToday(activeHabit.id) && (
+                      <Check
+                        size={18}
+                        color={colors.limaDark}
+                        strokeWidth={2.6}
+                      />
+                    )}
                     <Text
                       style={[
                         styles.bigCheckButtonText,
@@ -418,14 +418,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       ]}
                     >
                       {isCompletedToday(activeHabit.id)
-                        ? '¡Completado con calma!'
-                        : 'Marcar como hecho hoy'}
+                        ? t.dashboard.doneCelebration
+                        : t.dashboard.doneQuestion}
                     </Text>
                   </TouchableOpacity>
-
-                  <Text style={styles.gentleFooterHint}>
-                    Sumás 1 día a tu ritmo sin presiones
-                  </Text>
                 </View>
               </View>
             )}
@@ -434,14 +430,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             {!activeHabit && (
               <View style={styles.stackRow}>
                 <View style={styles.nodeActive}>
-                  <Sprout size={19} color={THEME.colors.limaDark} />
+                  <Sprout size={19} color={colors.limaDark} />
                 </View>
                 <TouchableOpacity style={styles.addHabitCard} onPress={onOpenAddHabit}>
                   <Text style={styles.addHabitIcon}>🌱</Text>
-                  <Text style={styles.addHabitTitle}>Elegir nuevo hábito en foco</Text>
-                  <Text style={styles.addHabitSub}>
-                    Tus hábitos anteriores ya están en marcha. ¿Qué te gustaría construir ahora?
-                  </Text>
+                  <Text style={styles.addHabitTitle}>{t.dashboard.addHabitTitle}</Text>
+                  <Text style={styles.addHabitSub}>{t.dashboard.addHabitSub}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -450,24 +444,74 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           {/* MENSAJE DE CIERRE */}
           <View style={styles.closingBanner}>
             <View style={styles.closingIconCircle}>
-              <Sparkles size={16} color={THEME.colors.limaDark} />
+              <Sparkles size={16} color={colors.limaDark} />
             </View>
             <Text style={styles.closingBannerText}>
               {totalCheckable > 0 && totalDone === totalCheckable
-                ? 'Rutina completa por hoy. Gran constancia, buen descanso.'
-                : 'Hacer una sola cosa bien transforma todo el año. Sin apuro.'}
+                ? t.dashboard.closingDone
+                : t.dashboard.closingPending}
             </Text>
           </View>
         </ScrollView>
       </View>
+
+      <ConfettiBurst triggerKey={confettiKey} />
+
+      <Modal
+        visible={helpContent !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setHelpTopic(null)}
+      >
+        <TouchableOpacity
+          style={styles.helpOverlay}
+          activeOpacity={1}
+          onPress={() => setHelpTopic(null)}
+        >
+          <TouchableOpacity
+            style={styles.helpDialog}
+            activeOpacity={1}
+            onPress={() => {}}
+          >
+            {helpContent && (
+              <>
+                <View
+                  style={[
+                    styles.helpIconWrap,
+                    {
+                      backgroundColor: helpContent.iconBg,
+                      borderColor: helpContent.iconBorder,
+                    },
+                  ]}
+                >
+                  {helpContent.icon}
+                </View>
+                <Text style={styles.helpTitle}>{helpContent.title}</Text>
+                {helpContent.paragraphs.map((text, idx) => (
+                  <Text key={idx} style={styles.helpBody}>
+                    {text}
+                  </Text>
+                ))}
+                <TouchableOpacity
+                  style={styles.helpCloseBtn}
+                  onPress={() => setHelpTopic(null)}
+                >
+                  <Text style={styles.helpCloseBtnText}>{t.dashboard.understood}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppTheme>['shadows']) =>
+  StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: THEME.colors.cream,
+    backgroundColor: colors.cream,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0,
   },
   mobileFrame: {
@@ -475,7 +519,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 430,
     alignSelf: 'center',
-    backgroundColor: THEME.colors.cream,
+    backgroundColor: colors.cream,
   },
   container: {
     paddingHorizontal: 16,
@@ -490,47 +534,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 22,
   },
   headerBrandRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   brandLogoWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 15,
-    backgroundColor: THEME.colors.white,
+    width: 58,
+    height: 58,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: THEME.colors.dark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
   },
   brandLogo: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 56,
+    height: 56,
   },
   appBrandTextCol: {
     justifyContent: 'center',
   },
   appBrandTop: {
     fontFamily: THEME.fonts.bold,
-    fontSize: 20,
-    lineHeight: 22,
-    color: THEME.colors.dark,
+    fontSize: 24,
+    lineHeight: 26,
+    color: colors.dark,
     letterSpacing: -0.5,
   },
   appBrandBottom: {
     fontFamily: THEME.fonts.bold,
-    fontSize: 20,
-    lineHeight: 22,
-    color: THEME.colors.coral,
+    fontSize: 24,
+    lineHeight: 26,
+    color: colors.coral,
     letterSpacing: -0.5,
   },
   topActions: {
@@ -542,9 +578,9 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -553,12 +589,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 12,
   },
   dateText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.muted,
+    color: colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.7,
   },
@@ -570,45 +606,14 @@ const styles = StyleSheet.create({
   greetingTitle: {
     fontFamily: THEME.fonts.medium,
     fontSize: 25,
-    color: THEME.colors.dark,
+    color: colors.dark,
     letterSpacing: -0.4,
-  },
-  ringBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: THEME.colors.white,
-    borderWidth: 2,
-    borderColor: THEME.colors.coral,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringBadgeText: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 11,
-    color: THEME.colors.coral,
-  },
-  progressPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: THEME.colors.limaLight,
-    borderWidth: 1,
-    borderColor: THEME.colors.lima,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: THEME.radius.full,
-  },
-  progressPillText: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 11,
-    color: THEME.colors.limaDark,
   },
   pendingShieldBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: THEME.colors.coralLight,
+    backgroundColor: colors.coralLight,
     borderWidth: 1,
     borderColor: '#F5C4BC',
     borderRadius: 16,
@@ -620,7 +625,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -630,21 +635,21 @@ const styles = StyleSheet.create({
   pendingShieldTitle: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 12,
-    color: THEME.colors.coralDark,
+    color: colors.coralDark,
   },
   pendingShieldSub: {
     fontFamily: THEME.fonts.regular,
     fontSize: 11,
-    color: THEME.colors.muted,
+    color: colors.muted,
     marginTop: 1,
   },
   longPausedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: THEME.colors.aquaLight,
+    backgroundColor: colors.aquaLight,
     borderWidth: 1,
-    borderColor: THEME.colors.aqua,
+    borderColor: colors.aqua,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -654,7 +659,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -664,7 +669,7 @@ const styles = StyleSheet.create({
   longPausedTitle: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 12,
-    color: THEME.colors.aquaDark,
+    color: colors.aquaDark,
   },
   stackContainer: {
     position: 'relative',
@@ -676,7 +681,7 @@ const styles = StyleSheet.create({
     top: 22,
     bottom: 36,
     width: 2,
-    backgroundColor: THEME.colors.aqua,
+    backgroundColor: colors.aqua,
     opacity: 0.65,
   },
   stackRow: {
@@ -688,9 +693,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: THEME.colors.aquaLight,
+    backgroundColor: colors.aquaLight,
     borderWidth: 1,
-    borderColor: THEME.colors.aqua,
+    borderColor: colors.aqua,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -698,9 +703,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: THEME.colors.aqua,
+    borderColor: colors.aqua,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -708,7 +713,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: THEME.colors.aqua,
+    backgroundColor: colors.aqua,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -716,60 +721,126 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: THEME.colors.lima,
+    backgroundColor: colors.lima,
     borderWidth: 2,
-    borderColor: THEME.colors.white,
+    borderColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   anchorCard: {
     flex: 1,
-    backgroundColor: THEME.colors.white,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    borderRadius: 18,
-    padding: 13,
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.aqua,
+    borderRadius: 22,
+    padding: 18,
+    ...shadows.card,
   },
   anchorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 3,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  anchorTagText: {
+  anchorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.aquaLight,
+    borderWidth: 1,
+    borderColor: colors.aqua,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: THEME.radius.full,
+  },
+  anchorPillText: {
     fontFamily: THEME.fonts.semibold,
-    fontSize: 10,
-    color: THEME.colors.aquaDark,
-    letterSpacing: 0.7,
+    fontSize: 11,
+    color: colors.aquaDark,
+  },
+  anchorHelpBtn: {
+    padding: 4,
+    borderRadius: THEME.radius.full,
   },
   anchorTitle: {
     fontFamily: THEME.fonts.medium,
-    fontSize: 15,
-    color: THEME.colors.dark,
+    fontSize: 20,
+    lineHeight: 26,
+    color: colors.dark,
   },
-  anchorSub: {
+  helpOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(18, 30, 28, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  helpDialog: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.white,
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  helpIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.aquaLight,
+    borderWidth: 1,
+    borderColor: colors.aqua,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  helpTitle: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 18,
+    color: colors.dark,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  helpBody: {
     fontFamily: THEME.fonts.regular,
-    fontSize: 12,
-    color: THEME.colors.muted,
-    marginTop: 1,
+    fontSize: 14,
+    lineHeight: 21,
+    color: colors.muted,
+    marginBottom: 10,
+  },
+  helpCloseBtn: {
+    marginTop: 6,
+    backgroundColor: colors.coral,
+    borderRadius: THEME.radius.full,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  helpCloseBtnText: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 14,
+    color: '#FFFFFF',
   },
   graduatedCard: {
     flex: 1,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     borderRadius: 18,
     padding: 14,
+    ...shadows.card,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
     gap: 8,
   },
   graduatedPill: {
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     paddingHorizontal: 9,
     paddingVertical: 3,
     borderRadius: THEME.radius.full,
@@ -777,12 +848,12 @@ const styles = StyleSheet.create({
   graduatedPillText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
   integratedText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.aquaDark,
+    color: colors.aquaDark,
   },
   metaInline: {
     flexDirection: 'row',
@@ -793,19 +864,20 @@ const styles = StyleSheet.create({
   graduatedStreak: {
     fontFamily: THEME.fonts.regular,
     fontSize: 12,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
   maintenanceCard: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     borderRadius: 18,
     padding: 14,
     gap: 10,
+    ...shadows.card,
   },
   maintenanceInfo: {
     flex: 1,
@@ -818,7 +890,7 @@ const styles = StyleSheet.create({
   },
   maintenancePill: {
     alignSelf: 'flex-start',
-    backgroundColor: THEME.colors.aquaLight,
+    backgroundColor: colors.aquaLight,
     borderWidth: 1,
     borderColor: '#BCE6E4',
     paddingHorizontal: 9,
@@ -827,9 +899,9 @@ const styles = StyleSheet.create({
   },
   anchorReadyPill: {
     alignSelf: 'flex-start',
-    backgroundColor: THEME.colors.limaLight,
+    backgroundColor: colors.limaLight,
     borderWidth: 1,
-    borderColor: THEME.colors.lima,
+    borderColor: colors.lima,
     paddingHorizontal: 9,
     paddingVertical: 2,
     borderRadius: THEME.radius.full,
@@ -837,49 +909,50 @@ const styles = StyleSheet.create({
   anchorReadyPillText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 10,
-    color: THEME.colors.limaDark,
+    color: colors.limaDark,
   },
   maintenancePillText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 10,
-    color: THEME.colors.aquaDark,
+    color: colors.aquaDark,
   },
   habitTitle: {
     fontFamily: THEME.fonts.medium,
     fontSize: 15,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   streakFlame: {
     fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: THEME.colors.coral,
+    color: colors.coral,
   },
   checkboxCircle: {
     width: 42,
     height: 42,
     borderRadius: 21,
     borderWidth: 1.5,
-    borderColor: THEME.colors.aqua,
-    backgroundColor: THEME.colors.aquaLight,
+    borderColor: colors.aqua,
+    backgroundColor: colors.aquaLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxCircleDone: {
-    backgroundColor: THEME.colors.aquaDark,
-    borderColor: THEME.colors.aquaDark,
+    backgroundColor: colors.aquaDark,
+    borderColor: colors.aquaDark,
   },
   activeCard: {
     flex: 1,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 22,
-    padding: 15,
+    padding: 18,
     borderWidth: 1.5,
-    borderColor: THEME.colors.lima,
+    borderColor: colors.lima,
+    ...shadows.card,
   },
   activePill: {
-    backgroundColor: THEME.colors.limaLight,
+    backgroundColor: colors.limaLight,
     borderWidth: 1,
-    borderColor: THEME.colors.lima,
+    borderColor: colors.lima,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: THEME.radius.full,
@@ -887,49 +960,19 @@ const styles = StyleSheet.create({
   activePillText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.limaDark,
-  },
-  shieldsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: THEME.colors.coralLight,
-    borderWidth: 1,
-    borderColor: '#F5C4BC',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: THEME.radius.full,
-  },
-  shieldsCount: {
-    fontFamily: THEME.fonts.semibold,
-    fontSize: 11,
-    color: THEME.colors.coralDark,
-    marginLeft: 2,
-  },
-  anchorLinkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 2,
-    marginBottom: 4,
-  },
-  activeAnchorText: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 12,
-    color: THEME.colors.muted,
-    flex: 1,
+    color: colors.limaDark,
   },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   activeHabitTitle: {
     fontFamily: THEME.fonts.medium,
     fontSize: 21,
-    color: THEME.colors.dark,
+    color: colors.dark,
     flex: 1,
     lineHeight: 27,
   },
@@ -937,7 +980,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: THEME.radius.full,
@@ -945,43 +988,43 @@ const styles = StyleSheet.create({
   seeDetailText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.aquaDark,
+    color: colors.aquaDark,
   },
   targetProgressBox: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   progressRowText: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   progressSub: {
     fontFamily: THEME.fonts.regular,
     fontSize: 12,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
   progressPercent: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 12,
-    color: THEME.colors.coral,
+    color: colors.coral,
   },
   progressBarTrack: {
     height: 9,
-    backgroundColor: THEME.colors.surfaceLow,
+    backgroundColor: colors.surfaceLow,
     borderRadius: 99,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: THEME.colors.lima,
+    backgroundColor: colors.lima,
     borderRadius: 99,
   },
   readyConsolidateBanner: {
-    backgroundColor: THEME.colors.limaLight,
+    backgroundColor: colors.limaLight,
     borderWidth: 1,
-    borderColor: THEME.colors.lima,
+    borderColor: colors.lima,
     borderRadius: 14,
     padding: 11,
     marginBottom: 12,
@@ -989,51 +1032,45 @@ const styles = StyleSheet.create({
   readyConsolidateTitle: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 13,
-    color: THEME.colors.limaDark,
+    color: colors.limaDark,
     marginBottom: 2,
   },
   readyConsolidateSub: {
     fontFamily: THEME.fonts.regular,
     fontSize: 11,
-    color: THEME.colors.dark,
+    color: colors.dark,
     lineHeight: 16,
   },
   bigCheckButton: {
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: THEME.colors.coral,
+    backgroundColor: colors.coral,
     paddingVertical: 14,
     borderRadius: THEME.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bigCheckButtonDone: {
-    backgroundColor: THEME.colors.lima,
+    backgroundColor: colors.lima,
   },
   bigCheckButtonText: {
     fontFamily: THEME.fonts.semibold,
-    color: THEME.colors.white,
+    color: '#FFFFFF',
     fontSize: 15,
   },
   bigCheckButtonTextDone: {
-    color: THEME.colors.limaDark,
-  },
-  gentleFooterHint: {
-    fontFamily: THEME.fonts.regular,
-    fontSize: 11,
-    color: THEME.colors.outline,
-    textAlign: 'center',
-    marginTop: 8,
+    color: colors.limaDark,
   },
   addHabitCard: {
     flex: 1,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 20,
     padding: 18,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: THEME.colors.aqua,
+    borderColor: colors.aqua,
     borderStyle: 'dashed',
+    ...shadows.card,
   },
   addHabitIcon: {
     fontSize: 30,
@@ -1042,14 +1079,14 @@ const styles = StyleSheet.create({
   addHabitTitle: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 15,
-    color: THEME.colors.dark,
+    color: colors.dark,
     marginBottom: 4,
     textAlign: 'center',
   },
   addHabitSub: {
     fontFamily: THEME.fonts.regular,
     fontSize: 12,
-    color: THEME.colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -1058,27 +1095,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     borderRadius: 18,
     padding: 12,
+    ...shadows.card,
   },
   closingIconCircle: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: THEME.colors.limaLight,
+    backgroundColor: colors.limaLight,
     borderWidth: 1,
-    borderColor: THEME.colors.lima,
+    borderColor: colors.lima,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closingBannerText: {
     fontFamily: THEME.fonts.regular,
     flex: 1,
-    fontSize: 12,
-    color: THEME.colors.muted,
-    lineHeight: 18,
+    fontSize: 14,
+    color: colors.muted,
+    lineHeight: 20,
   },
 });

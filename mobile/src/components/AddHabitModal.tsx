@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,9 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { THEME } from '../theme/colors';
+import { THEME, ThemeColors } from '../theme/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useTranslation } from '../i18n/translations';
 import { Habit } from '../types/habit';
 
 interface AddHabitModalProps {
@@ -28,15 +30,11 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
   const [name, setName] = useState('');
   const [color, setColor] = useState(THEME.palette[0].hex);
   const [anchorText, setAnchorText] = useState('');
+  const { colors } = useAppTheme();
+  const { t, language } = useTranslation();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const suggestions = [
-    'Leer 10 minutos',
-    'Caminar 15 minutos',
-    'Tomar 2L de agua',
-    'Meditar 5 minutos',
-    'Escribir 3 gratitudes',
-    'Estirar la espalda',
-  ];
+  const suggestions = t.onboarding.step2Suggestions;
 
   const handleSave = () => {
     if (!name.trim()) return;
@@ -53,8 +51,8 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
         <View style={styles.sheetContainer}>
           <View style={styles.sheetHeader}>
             <View>
-              <Text style={styles.badgeText}>🌱 NUEVO HÁBITO EN FOCO</Text>
-              <Text style={styles.title}>¿Qué vas a construir ahora?</Text>
+              <Text style={styles.badgeText}>{t.modals.addTitle}</Text>
+              <Text style={styles.title}>{t.modals.addSub}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
@@ -62,11 +60,11 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            <Text style={styles.inputLabel}>Nombre del hábito</Text>
+            <Text style={styles.inputLabel}>{t.modals.addTitle}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ej. Meditar 5 minutos..."
-              placeholderTextColor={THEME.colors.muted}
+              placeholder={t.modals.addNamePlaceholder}
+              placeholderTextColor={colors.muted}
               value={name}
               onChangeText={setName}
             />
@@ -85,7 +83,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
             </View>
 
             {/* Color */}
-            <Text style={styles.inputLabel}>Color suave</Text>
+            <Text style={styles.inputLabel}>{t.onboarding.step2ColorLabel}</Text>
             <View style={styles.colorRow}>
               {THEME.palette.map((c) => (
                 <TouchableOpacity
@@ -103,10 +101,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
             </View>
 
             {/* Ancla de rutina (Habit Stacking) */}
-            <Text style={styles.inputLabel}>Vincular a un ancla (opcional)</Text>
-            <Text style={styles.helperText}>
-              ¿Después de qué acción o rutina que ya hacés vas a realizar este hábito?
-            </Text>
+            <Text style={styles.inputLabel}>{t.modals.addAnchorLabel}</Text>
 
             {/* Si hay hábitos en mantenimiento o graduados, ofrecerlos como sugerencia */}
             {availableAnchors.length > 0 && (
@@ -115,9 +110,17 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
                   <TouchableOpacity
                     key={h.id}
                     style={styles.anchorChip}
-                    onPress={() => setAnchorText(`Después de ${h.name.toLowerCase()}`)}
+                    onPress={() =>
+                      setAnchorText(
+                        language === 'en'
+                          ? `After ${h.name.toLowerCase()}`
+                          : `Después de ${h.name.toLowerCase()}`
+                      )
+                    }
                   >
-                    <Text style={styles.anchorChipText}>↳ Después de {h.name}</Text>
+                    <Text style={styles.anchorChipText}>
+                      ↳ {language === 'en' ? `After ${h.name}` : `Después de ${h.name}`}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -125,8 +128,8 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
 
             <TextInput
               style={styles.input}
-              placeholder="Ej. Después del café mañanero, al cepillarme los dientes..."
-              placeholderTextColor={THEME.colors.muted}
+              placeholder={t.modals.addAnchorPlaceholder}
+              placeholderTextColor={colors.muted}
               value={anchorText}
               onChangeText={setAnchorText}
             />
@@ -137,7 +140,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
               onPress={handleSave}
               disabled={!name.trim()}
             >
-              <Text style={styles.saveBtnText}>Comenzar este hábito 🌱</Text>
+              <Text style={styles.saveBtnText}>{t.modals.addBtn}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -146,7 +149,8 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(45, 49, 46, 0.45)',
@@ -156,7 +160,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
-    backgroundColor: THEME.colors.cream,
+    backgroundColor: colors.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 24,
@@ -173,7 +177,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.sage,
+    color: colors.sage,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 4,
@@ -181,19 +185,19 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: THEME.fonts.medium,
     fontSize: 21,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   closeBtn: {
     padding: 8,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderRadius: THEME.radius.full,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
   },
   closeBtnText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 14,
-    color: THEME.colors.muted,
+    color: colors.muted,
   },
   scrollContent: {
     paddingBottom: 20,
@@ -201,7 +205,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    color: THEME.colors.dark,
+    color: colors.dark,
     textTransform: 'uppercase',
     marginTop: 14,
     marginBottom: 6,
@@ -209,20 +213,20 @@ const styles = StyleSheet.create({
   helperText: {
     fontFamily: THEME.fonts.regular,
     fontSize: 12,
-    color: THEME.colors.muted,
+    color: colors.muted,
     marginBottom: 8,
     lineHeight: 16,
   },
   input: {
     fontFamily: THEME.fonts.regular,
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     borderRadius: THEME.radius.md,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 14,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   chipsRow: {
     flexDirection: 'row',
@@ -232,9 +236,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   chip: {
-    backgroundColor: THEME.colors.white,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     borderRadius: THEME.radius.full,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -242,7 +246,7 @@ const styles = StyleSheet.create({
   chipText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   colorRow: {
     flexDirection: 'row',
@@ -259,7 +263,7 @@ const styles = StyleSheet.create({
   },
   colorCircleSelected: {
     borderWidth: 3,
-    borderColor: THEME.colors.dark,
+    borderColor: colors.dark,
   },
   checkMark: {
     fontFamily: THEME.fonts.semibold,
@@ -273,9 +277,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   anchorChip: {
-    backgroundColor: THEME.colors.sageLight,
+    backgroundColor: colors.sageLight,
     borderWidth: 1,
-    borderColor: THEME.colors.sage,
+    borderColor: colors.sage,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: THEME.radius.full,
@@ -283,10 +287,10 @@ const styles = StyleSheet.create({
   anchorChipText: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: THEME.colors.dark,
+    color: colors.dark,
   },
   saveBtn: {
-    backgroundColor: THEME.colors.coral,
+    backgroundColor: colors.coral,
     paddingVertical: 14,
     borderRadius: THEME.radius.full,
     alignItems: 'center',
