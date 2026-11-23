@@ -1,3 +1,11 @@
+[build]
+  base = "mobile"
+  command = "npm install && npx expo export --platform web"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
 [[headers]]
   for = "/"
   [headers.values]
