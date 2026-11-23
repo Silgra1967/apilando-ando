@@ -163,6 +163,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheetContainer: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     backgroundColor: THEME.colors.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -178,16 +181,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   badgeText: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    fontWeight: '800',
     color: THEME.colors.terracotta,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 4,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '900',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 21,
     color: THEME.colors.dark,
   },
   closeBtn: {
@@ -198,8 +201,8 @@ const styles = StyleSheet.create({
     borderColor: THEME.colors.border,
   },
   closeBtnText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 14,
-    fontWeight: '800',
     color: THEME.colors.muted,
   },
   content: {
@@ -214,12 +217,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   statsGreeting: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 15,
     color: THEME.colors.dark,
     marginBottom: 2,
   },
   statsDescription: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 12,
     color: THEME.colors.muted,
     lineHeight: 16,
@@ -236,13 +240,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   metricNumber: {
-    fontSize: 18,
-    fontWeight: '900',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 19,
     color: THEME.colors.dark,
   },
   metricLabel: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 10,
-    fontWeight: '700',
     color: THEME.colors.muted,
     marginTop: 2,
   },
@@ -266,22 +270,23 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   activeTag: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 10,
-    fontWeight: '800',
     color: THEME.colors.sage,
     textTransform: 'uppercase',
   },
   activeStreakText: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 12,
-    fontWeight: '800',
     color: THEME.colors.dark,
   },
   activeName: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 18,
-    fontWeight: '900',
     color: THEME.colors.dark,
   },
   activeAnchor: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 12,
     color: THEME.colors.muted,
     marginTop: 2,
@@ -294,28 +299,29 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   decisionTitle: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 13,
-    fontWeight: '800',
     color: THEME.colors.dark,
     marginBottom: 4,
   },
   decisionText: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 12,
     color: THEME.colors.dark,
     lineHeight: 17,
     marginBottom: 12,
   },
   promoteBtn: {
-    backgroundColor: THEME.colors.sage,
+    backgroundColor: THEME.colors.coral,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: THEME.radius.md,
+    borderRadius: THEME.radius.full,
     alignItems: 'center',
   },
   promoteBtnText: {
+    fontFamily: THEME.fonts.semibold,
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '800',
     textAlign: 'center',
   },
   decisionPedagogy: {
@@ -325,12 +331,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   pedagogyTitle: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 13,
-    fontWeight: '800',
     color: THEME.colors.dark,
     marginBottom: 4,
   },
   pedagogyText: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 12,
     color: THEME.colors.dark,
     lineHeight: 17,
@@ -341,12 +348,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.colors.border,
     paddingVertical: 10,
-    borderRadius: THEME.radius.md,
+    borderRadius: THEME.radius.full,
     alignItems: 'center',
   },
   pedagogyBtnText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    fontWeight: '700',
     color: THEME.colors.dark,
   },
 });

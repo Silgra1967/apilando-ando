@@ -18,13 +18,18 @@ interface HabitStore {
   toggleDayCompletion: (habitId: string, dateStr: string) => Promise<MilestoneCelebrationData | null>;
   useShield: (habitId: string, dateStr: string) => Promise<void>;
   resetStreak: (habitId: string) => Promise<void>;
+  resolveShieldDecisions: (
+    dateStr: string,
+    protectedHabitIds: string[],
+    resetHabitIds: string[]
+  ) => Promise<void>;
   pauseHabit: (habitId: string) => Promise<void>;
   resumeHabit: (habitId: string) => Promise<void>;
   archiveHabit: (habitId: string) => Promise<void>;
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   resetAllData: () => Promise<void>;
   checkPendingShieldsAndExpiration: () => Promise<{
-    pendingHabit: Habit;
+    pendingHabits: Habit[];
     missedDate: string;
   } | null>;
   setSimulatedStreak: (habitId: string, streak: number, shields?: number) => Promise<void>;
@@ -272,6 +277,53 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
   },
 
+  resolveShieldDecisions: async (dateStr, protectedHabitIds, resetHabitIds) => {
+    const { habits, logs } = get();
+    const protectSet = new Set(protectedHabitIds);
+    const resetSet = new Set(resetHabitIds);
+    const updatedLogs = { ...logs };
+    const nowISO = new Date().toISOString();
+
+    const updatedHabits = habits.map((h) => {
+      if (protectSet.has(h.id) && h.shieldsAvailable > 0) {
+        const logKey = `${h.id}_${dateStr}`;
+        updatedLogs[logKey] = {
+          id: logKey,
+          habitId: h.id,
+          date: dateStr,
+          status: 'shielded',
+          loggedAt: nowISO,
+        };
+        return {
+          ...h,
+          shieldsAvailable: h.shieldsAvailable - 1,
+        };
+      }
+      if (resetSet.has(h.id)) {
+        const logKey = `${h.id}_${dateStr}`;
+        updatedLogs[logKey] = {
+          id: logKey,
+          habitId: h.id,
+          date: dateStr,
+          status: 'missed',
+          loggedAt: nowISO,
+        };
+        return {
+          ...h,
+          currentStreak: 0,
+        };
+      }
+      return h;
+    });
+
+    set({ habits: updatedHabits, logs: updatedLogs });
+
+    await Promise.all([
+      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits)),
+      AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs)),
+    ]);
+  },
+
   promoteToMaintenance: async (habitId) => {
     const { habits } = get();
     const updatedHabits = habits.map((h) => {
@@ -424,51 +476,53 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
   checkPendingShieldsAndExpiration: async () => {
     const { habits, logs } = get();
-    const activeHabit = habits.find((h) => h.status === 'active');
-    if (!activeHabit) return null;
+    const checkableHabits = habits.filter(
+      (h) => h.status === 'active' || h.status === 'maintenance'
+    );
+    if (checkableHabits.length === 0) return null;
 
     const now = new Date();
     // Ayer
     const yesterday = new Date(Date.now() - 86400000);
-    const yYear = yesterday.getFullYear();
-    const yMonth = String(yesterday.getMonth() + 1).padStart(2, '0');
-    const yDay = String(yesterday.getDate()).padStart(2, '0');
-    const yesterdayStr = `${yYear}-${yMonth}-${yDay}`;
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
     // Anteayer
     const dayBefore = new Date(Date.now() - 86400000 * 2);
-    const bYear = dayBefore.getFullYear();
-    const bMonth = String(dayBefore.getMonth() + 1).padStart(2, '0');
-    const bDay = String(dayBefore.getDate()).padStart(2, '0');
-    const dayBeforeStr = `${bYear}-${bMonth}-${bDay}`;
+    const dayBeforeStr = `${dayBefore.getFullYear()}-${String(dayBefore.getMonth() + 1).padStart(2, '0')}-${String(dayBefore.getDate()).padStart(2, '0')}`;
 
-    const yesterdayLog = logs[`${activeHabit.id}_${yesterdayStr}`];
-    const dayBeforeLog = logs[`${activeHabit.id}_${dayBeforeStr}`];
+    // 1. Expiración estricta a las 23:59 del día siguiente para hábitos activos y en mantenimiento
+    let expiredAny = false;
+    const updatedAfterExpiration = habits.map((h) => {
+      if (h.status !== 'active' && h.status !== 'maintenance') return h;
+      const dayBeforeLog = logs[`${h.id}_${dayBeforeStr}`];
+      if (
+        (!dayBeforeLog || dayBeforeLog.status === 'missed') &&
+        h.currentStreak > 0 &&
+        now.getTime() - dayBefore.getTime() > 86400000 * 2
+      ) {
+        expiredAny = true;
+        return { ...h, currentStreak: 0 };
+      }
+      return h;
+    });
 
-    // 1. Expiración estricta a las 23:59 del día siguiente:
-    // Si anteayer no se tildó ni se protegió y la racha era > 0, se rompió la ventana de confirmación
-    if (
-      (!dayBeforeLog || dayBeforeLog.status === 'missed') &&
-      activeHabit.currentStreak > 0 &&
-      now.getTime() - dayBefore.getTime() > 86400000 * 2
-    ) {
-      // Reiniciar racha por expiración sin culpa
-      const updated = habits.map((h) =>
-        h.id === activeHabit.id ? { ...h, currentStreak: 0 } : h
-      );
-      set({ habits: updated });
-      await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated));
+    if (expiredAny) {
+      set({ habits: updatedAfterExpiration });
+      await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedAfterExpiration));
     }
 
-    // 2. Detección automática de escudo pendiente de ayer
-    // Si ayer no se tildó y hay escudos disponibles y la racha es > 0
-    if (
-      !yesterdayLog &&
-      activeHabit.shieldsAvailable > 0 &&
-      activeHabit.currentStreak > 0
-    ) {
+    // 2. Detección agrupada de escudos pendientes de ayer (active primero, luego maintenance)
+    const pendingHabits = updatedAfterExpiration
+      .filter((h) => h.status === 'active' || h.status === 'maintenance')
+      .sort((a, b) => (a.status === 'active' ? -1 : b.status === 'active' ? 1 : 0))
+      .filter((h) => {
+        const yesterdayLog = logs[`${h.id}_${yesterdayStr}`];
+        return !yesterdayLog && h.shieldsAvailable > 0 && h.currentStreak > 0;
+      });
+
+    if (pendingHabits.length > 0) {
       return {
-        pendingHabit: activeHabit,
+        pendingHabits,
         missedDate: yesterdayStr,
       };
     }
@@ -477,19 +531,28 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
   },
 
   setSimulatedStreak: async (habitId, streak, shields = 1) => {
-    const { habits } = get();
+    const { habits, logs } = get();
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const updatedLogs = { ...logs };
+    delete updatedLogs[`${habitId}_${todayStr}`];
+
     const updated = habits.map((h) =>
       h.id === habitId
         ? {
             ...h,
             currentStreak: streak,
             bestStreak: Math.max(h.bestStreak, streak),
+            totalCompletedDays: Math.max(h.totalCompletedDays, streak),
             shieldsAvailable: shields,
           }
         : h
     );
-    set({ habits: updated });
-    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated));
+    set({ habits: updated, logs: updatedLogs });
+    await Promise.all([
+      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated)),
+      AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs)),
+    ]);
   },
 
   simulateFullHistoryEnvironment: async () => {

@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+import {
+  useFonts,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { useHabitStore } from './src/store/habitStore';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
@@ -17,7 +24,11 @@ import {
 } from './src/components/MilestoneCelebrationModal';
 import { Habit } from './src/types/habit';
 import { THEME } from './src/theme/colors';
-import { scheduleDailyReminder } from './src/services/notificationService';
+import {
+  scheduleDailyReminder,
+  scheduleShieldAlert,
+  cancelShieldAlerts,
+} from './src/services/notificationService';
 
 function AppContent() {
   const {
@@ -25,10 +36,10 @@ function AppContent() {
     loadFromStorage,
     settings,
     habits,
-    useShield,
-    resetStreak,
+    resolveShieldDecisions,
     promoteToMaintenance,
     addNewActiveHabit,
+    updateSettings,
     checkPendingShieldsAndExpiration,
   } = useHabitStore();
   const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'detail'>('dashboard');
@@ -43,6 +54,8 @@ function AppContent() {
   const [monthlyReviewVisible, setMonthlyReviewVisible] = useState<boolean>(false);
   const [milestoneCelebration, setMilestoneCelebration] = useState<MilestoneCelebrationData | null>(null);
   const [pendingShieldDate, setPendingShieldDate] = useState<string | null>(null);
+  const [pendingShieldHabits, setPendingShieldHabits] = useState<Habit[]>([]);
+  const [simulatingShield, setSimulatingShield] = useState<boolean>(false);
 
   useEffect(() => {
     loadFromStorage();
@@ -51,17 +64,37 @@ function AppContent() {
   // Programar recordatorio diario y verificar escudos pendientes al abrir
   useEffect(() => {
     if (isLoaded && settings.onboardingCompleted) {
-      scheduleDailyReminder(settings.reminderTime || '20:00');
+      if (settings.notificationsEnabled) {
+        scheduleDailyReminder(settings.reminderTime || '20:00');
+      }
 
-      // Comprobar automáticamente si ayer faltó tildar y hay escudos
+      // Comprobar automáticamente si ayer faltó tildar y hay escudos (activo + mantenimiento)
       checkPendingShieldsAndExpiration().then((pending) => {
-        if (pending) {
+        if (pending && pending.pendingHabits.length > 0) {
+          setPendingShieldHabits(pending.pendingHabits);
           setPendingShieldDate(pending.missedDate);
+          setSimulatingShield(false);
           setShieldModalVisible(true);
+          if (settings.notificationsEnabled) {
+            scheduleShieldAlert(pending.pendingHabits.map((h) => h.name));
+          }
+        } else {
+          setPendingShieldHabits([]);
+          setPendingShieldDate(null);
+          cancelShieldAlerts();
+
+          // Disparo automático de Revisión Mensual (día 1 o últimos 2 días del mes, una sola vez por mes)
+          const now = new Date();
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const isReviewWindow = now.getDate() === 1 || now.getDate() >= daysInMonth - 1;
+          const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          if (isReviewWindow && settings.lastMonthlyReviewDismissed !== currentMonthKey) {
+            setMonthlyReviewVisible(true);
+          }
         }
       });
     }
-  }, [isLoaded, settings.onboardingCompleted, settings.reminderTime]);
+  }, [isLoaded, settings.onboardingCompleted, settings.reminderTime, settings.notificationsEnabled]);
 
   if (!isLoaded) {
     return (
@@ -82,7 +115,19 @@ function AppContent() {
   }
 
   const activeHabit = habits.find((h) => h.status === 'active') || habits[0];
-  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const yesterdayLocal = new Date(Date.now() - 86400000);
+  const yesterdayStr = `${yesterdayLocal.getFullYear()}-${String(yesterdayLocal.getMonth() + 1).padStart(2, '0')}-${String(yesterdayLocal.getDate()).padStart(2, '0')}`;
+  const checkableWithShields = habits.filter(
+    (h) => (h.status === 'active' || h.status === 'maintenance') && h.shieldsAvailable > 0
+  );
+  const modalShieldHabits =
+    !simulatingShield && pendingShieldHabits.length > 0
+      ? pendingShieldHabits
+      : checkableWithShields.length > 0
+      ? checkableWithShields
+      : activeHabit
+      ? [activeHabit]
+      : [];
 
   return (
     <>
@@ -94,7 +139,10 @@ function AppContent() {
             setSelectedHabit(habit);
             setCurrentScreen('detail');
           }}
-          onSimulateShield={() => setShieldModalVisible(true)}
+          onSimulateShield={() => {
+            setSimulatingShield(pendingShieldHabits.length === 0);
+            setShieldModalVisible(true);
+          }}
           onOpenAddHabit={() => setAddHabitModalVisible(true)}
           onPromoteHabit={(habit) => {
             setHabitToConsolidate(habit);
@@ -107,6 +155,11 @@ function AppContent() {
           onOpenSettings={() => setSettingsModalVisible(true)}
           onOpenMonthlyReview={() => setMonthlyReviewVisible(true)}
           onMilestoneReached={(celebration) => setMilestoneCelebration(celebration)}
+          pendingShieldCount={pendingShieldHabits.length}
+          onOpenPendingShields={() => {
+            setSimulatingShield(false);
+            setShieldModalVisible(true);
+          }}
         />
       ) : (
         selectedHabit && (
@@ -165,12 +218,21 @@ function AppContent() {
           setSelectedHabit(null);
           setCurrentScreen('dashboard');
         }}
+        onOpenHabitDetail={(habit) => {
+          setSelectedHabit(habit);
+          setCurrentScreen('detail');
+        }}
       />
 
       {/* Modal de Revisión y Balance Mensual */}
       <MonthlyReviewModal
         visible={monthlyReviewVisible}
-        onClose={() => setMonthlyReviewVisible(false)}
+        onClose={() => {
+          const now = new Date();
+          const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          updateSettings({ lastMonthlyReviewDismissed: currentMonthKey });
+          setMonthlyReviewVisible(false);
+        }}
         habits={habits}
         logs={useHabitStore.getState().logs}
         onPromoteAndAddHabit={async (habit) => {
@@ -179,26 +241,40 @@ function AppContent() {
         }}
       />
 
-      {/* Modal interactivo de confirmación de escudo */}
+      {/* Modal interactivo de confirmación de escudo (individual o agrupado) */}
       <ShieldModal
         visible={shieldModalVisible}
-        habit={activeHabit}
-        onConfirm={() => {
-          if (activeHabit) {
-            useShield(activeHabit.id, pendingShieldDate || yesterdayStr);
-          }
+        habits={modalShieldHabits}
+        onConfirmSingle={async (habit) => {
+          await resolveShieldDecisions(pendingShieldDate || yesterdayStr, [habit.id], []);
+          setPendingShieldHabits([]);
           setPendingShieldDate(null);
+          setSimulatingShield(false);
           setShieldModalVisible(false);
+          cancelShieldAlerts();
         }}
-        onReject={() => {
-          if (activeHabit) {
-            resetStreak(activeHabit.id);
-          }
+        onRejectSingle={async (habit) => {
+          await resolveShieldDecisions(pendingShieldDate || yesterdayStr, [], [habit.id]);
+          setPendingShieldHabits([]);
           setPendingShieldDate(null);
+          setSimulatingShield(false);
           setShieldModalVisible(false);
+          cancelShieldAlerts();
+        }}
+        onConfirmGrouped={async (protectedIds, resetIds) => {
+          await resolveShieldDecisions(
+            pendingShieldDate || yesterdayStr,
+            protectedIds,
+            resetIds
+          );
+          setPendingShieldHabits([]);
+          setPendingShieldDate(null);
+          setSimulatingShield(false);
+          setShieldModalVisible(false);
+          cancelShieldAlerts();
         }}
         onClose={() => {
-          setPendingShieldDate(null);
+          setSimulatingShield(false);
           setShieldModalVisible(false);
         }}
       />
@@ -214,6 +290,21 @@ function AppContent() {
 }
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+  });
+
+  if (!fontsLoaded && !fontError) {
+    return (
+      <View style={styles.centerLoading}>
+        <ActivityIndicator size="large" color={THEME.colors.coral} />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <AppContent />

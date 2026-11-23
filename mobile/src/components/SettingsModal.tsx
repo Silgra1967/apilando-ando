@@ -18,24 +18,46 @@ interface SettingsModalProps {
   visible: boolean;
   onClose: () => void;
   onResetOnboarding: () => void;
+  onOpenHabitDetail?: (habit: import('../types/habit').Habit) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   visible,
   onClose,
   onResetOnboarding,
+  onOpenHabitDetail,
 }) => {
   const {
     settings,
     updateSettings,
     habits,
     resetAllData,
+    resumeHabit,
     setSimulatedStreak,
     simulateFullHistoryEnvironment,
   } = useHabitStore();
   const [reminderTime, setReminderTime] = useState(settings.reminderTime || '20:00');
   const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notificationsEnabled);
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const activeHabit = habits.find((h) => h.status === 'active');
+  const pausedHabits = habits.filter((h) => h.status === 'paused');
+  const archivedHabits = habits.filter((h) => h.status === 'archived');
+
+  const getDaysPaused = (pausedAt?: string) => {
+    if (!pausedAt) return 0;
+    return Math.max(0, Math.floor((Date.now() - new Date(pausedAt).getTime()) / 86400000));
+  };
+
+  const handleClose = () => {
+    setConfirmingReset(false);
+    onClose();
+  };
+
+  const notifyIfNative = (alertTitle: string, alertBody: string) => {
+    if (Platform.OS !== 'web') {
+      Alert.alert(alertTitle, alertBody);
+    }
+  };
 
   const times = ['07:00', '08:30', '13:00', '19:00', '20:00', '21:30', '22:00'];
 
@@ -55,27 +77,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const confirmReset = () => {
-    Alert.alert(
-      'Reiniciar datos de prueba',
-      '¿Seguro que querés reiniciar la aplicación? Esto borrará tus hábitos actuales y volverá a mostrar el Onboarding inicial.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Reiniciar',
-          style: 'destructive',
-          onPress: async () => {
-            await resetAllData();
-            onClose();
-            onResetOnboarding();
-          },
-        },
-      ]
-    );
+  const handleConfirmReset = async () => {
+    await resetAllData();
+    setConfirmingReset(false);
+    onClose();
+    onResetOnboarding();
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.sheetContainer}>
           <View style={styles.header}>
@@ -83,7 +93,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Text style={styles.badgeText}>PREFERENCIAS</Text>
               <Text style={styles.title}>Configuración</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -158,8 +168,85 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </Text>
                   <Text style={styles.statLabel}>Anclas 🌳</Text>
                 </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>{pausedHabits.length}</Text>
+                  <Text style={styles.statLabel}>Pausados ⏸️</Text>
+                </View>
               </View>
             </View>
+
+            {/* SECCIÓN HÁBITOS PAUSADOS Y ARCHIVADOS */}
+            {(pausedHabits.length > 0 || archivedHabits.length > 0) && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Pausados y archivados</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Tu historial y stickers se conservan intactos. Podés retomar cuando te sientas listo.
+                </Text>
+
+                {pausedHabits.map((h) => {
+                  const daysPaused = getDaysPaused(h.pausedAt);
+                  return (
+                    <View key={h.id} style={styles.inactiveHabitRow}>
+                      <View style={styles.inactiveHabitInfo}>
+                        <Text style={styles.inactiveHabitName}>⏸️ {h.name}</Text>
+                        <Text style={styles.inactiveHabitMeta}>
+                          En pausa hace {daysPaused} {daysPaused === 1 ? 'día' : 'días'} · Racha conservada: {h.currentStreak}d
+                        </Text>
+                        {daysPaused >= 14 && (
+                          <Text style={styles.longPauseTag}>
+                            🌿 ¿Listo para retomar con calma?
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.inactiveActions}>
+                        <TouchableOpacity
+                          style={styles.resumeSmallBtn}
+                          onPress={async () => {
+                            await resumeHabit(h.id);
+                          }}
+                        >
+                          <Text style={styles.resumeSmallBtnText}>Reanudar</Text>
+                        </TouchableOpacity>
+                        {onOpenHabitDetail && (
+                          <TouchableOpacity
+                            style={styles.viewSmallBtn}
+                            onPress={() => {
+                              handleClose();
+                              onOpenHabitDetail(h);
+                            }}
+                          >
+                            <Text style={styles.viewSmallBtnText}>Ver</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+
+                {archivedHabits.map((h) => (
+                  <View key={h.id} style={styles.inactiveHabitRow}>
+                    <View style={styles.inactiveHabitInfo}>
+                      <Text style={styles.inactiveHabitName}>📦 {h.name}</Text>
+                      <Text style={styles.inactiveHabitMeta}>
+                        Archivado · {h.totalCompletedDays}d totales · Récord {h.bestStreak}d
+                      </Text>
+                    </View>
+                    {onOpenHabitDetail && (
+                      <TouchableOpacity
+                        style={styles.viewSmallBtn}
+                        onPress={() => {
+                          handleClose();
+                          onOpenHabitDetail(h);
+                        }}
+                      >
+                        <Text style={styles.viewSmallBtnText}>Ver historial</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* SIMULADOR RÁPIDO PARA PRUEBAS DE HITOS */}
             {activeHabit && (
@@ -173,8 +260,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     style={styles.simBtn}
                     onPress={async () => {
                       await setSimulatedStreak(activeHabit.id, 6, 1);
-                      Alert.alert('Racha ajustada a 6 días', 'Ahora andá a "Mi Día" y marcá el hábito para ver el festejo del hito de 7 días y la reposición de escudo.');
-                      onClose();
+                      notifyIfNative(
+                        'Racha ajustada a 6 días',
+                        'Ahora andá a "Mi Día" y marcá el hábito para ver el festejo del hito de 7 días y la reposición de escudo.'
+                      );
+                      handleClose();
                     }}
                   >
                     <Text style={styles.simBtnText}>Día 6 (para hito 7d 🔥)</Text>
@@ -183,8 +273,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     style={styles.simBtn}
                     onPress={async () => {
                       await setSimulatedStreak(activeHabit.id, 20, 1);
-                      Alert.alert('Racha ajustada a 20 días', 'Ahora andá a "Mi Día" y marcalo para ver el festejo del hito de 21 días, reposición y habilitación de consolidar.');
-                      onClose();
+                      notifyIfNative(
+                        'Racha ajustada a 20 días',
+                        'Ahora andá a "Mi Día" y marcalo para ver el festejo del hito de 21 días, reposición y habilitación de consolidar.'
+                      );
+                      handleClose();
                     }}
                   >
                     <Text style={styles.simBtnText}>Día 20 (para hito 21d 🌿)</Text>
@@ -196,11 +289,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   style={styles.fullSimBtn}
                   onPress={async () => {
                     await simulateFullHistoryEnvironment();
-                    Alert.alert(
+                    notifyIfNative(
                       '🌱 Rutina completa simulada',
                       'Se generó una rutina con:\n• 1 Hábito Graduado a Ancla (180d)\n• 1 Hábito en Mantenimiento (45d)\n• 1 Hábito Activo (12d)\n• 1 Hábito Pausado (15d)\n\nPodés explorar su cadena en Mi Día y tocar cualquiera para ver su historial y calendario.'
                     );
-                    onClose();
+                    handleClose();
                   }}
                 >
                   <Text style={styles.fullSimBtnText}>
@@ -214,11 +307,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <View style={styles.dangerSection}>
               <Text style={styles.dangerTitle}>Datos locales</Text>
               <Text style={styles.dangerSubtitle}>
-                Apliando Ando guarda todo offline en tu dispositivo. Podés reiniciar para volver a vivir el onboarding.
+                Apilando Ando guarda todo offline en tu dispositivo. Podés reiniciar para volver a vivir el onboarding.
               </Text>
-              <TouchableOpacity style={styles.resetBtn} onPress={confirmReset}>
-                <Text style={styles.resetBtnText}>🔄 Reiniciar datos y repetir Onboarding</Text>
-              </TouchableOpacity>
+              {!confirmingReset ? (
+                <TouchableOpacity style={styles.resetBtn} onPress={() => setConfirmingReset(true)}>
+                  <Text style={styles.resetBtnText}>🔄 Reiniciar datos y repetir Onboarding</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.confirmBox}>
+                  <Text style={styles.confirmText}>
+                    ¿Seguro que querés reiniciar? Se borrarán tus hábitos actuales y volverás al Onboarding inicial.
+                  </Text>
+                  <View style={styles.confirmActions}>
+                    <TouchableOpacity
+                      style={styles.cancelResetBtn}
+                      onPress={() => setConfirmingReset(false)}
+                    >
+                      <Text style={styles.cancelResetText}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.confirmResetBtn} onPress={handleConfirmReset}>
+                      <Text style={styles.confirmResetText}>Sí, reiniciar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
           </ScrollView>
         </View>
@@ -234,6 +346,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheetContainer: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     backgroundColor: THEME.colors.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -249,16 +364,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   badgeText: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    fontWeight: '800',
     color: THEME.colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 4,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '900',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 21,
     color: THEME.colors.dark,
   },
   closeBtn: {
@@ -269,8 +384,8 @@ const styles = StyleSheet.create({
     borderColor: THEME.colors.border,
   },
   closeBtnText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 14,
-    fontWeight: '800',
     color: THEME.colors.muted,
   },
   content: {
@@ -285,12 +400,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 15,
     color: THEME.colors.dark,
     marginBottom: 4,
   },
   sectionSubtitle: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 11,
     color: THEME.colors.muted,
     lineHeight: 16,
@@ -303,13 +419,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   switchLabel: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 13,
-    fontWeight: '700',
     color: THEME.colors.dark,
   },
   subLabel: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    fontWeight: '800',
     color: THEME.colors.muted,
     textTransform: 'uppercase',
     marginTop: 12,
@@ -333,8 +449,8 @@ const styles = StyleSheet.create({
     borderColor: THEME.colors.dark,
   },
   timeChipText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    fontWeight: '700',
     color: THEME.colors.dark,
   },
   timeChipTextActive: {
@@ -352,13 +468,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 18,
-    fontWeight: '900',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 19,
     color: THEME.colors.dark,
   },
   statLabel: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 10,
-    fontWeight: '700',
     color: THEME.colors.muted,
     marginTop: 2,
   },
@@ -391,8 +507,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   simBtnText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    fontWeight: '700',
     color: THEME.colors.dark,
     textAlign: 'center',
   },
@@ -407,18 +523,19 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   fullSimBtnText: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 12,
-    fontWeight: '800',
     color: THEME.colors.dark,
     textAlign: 'center',
   },
   dangerTitle: {
-    fontSize: 13,
-    fontWeight: '800',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 14,
     color: THEME.colors.dark,
     marginBottom: 4,
   },
   dangerSubtitle: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 11,
     color: THEME.colors.muted,
     lineHeight: 16,
@@ -433,8 +550,112 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resetBtnText: {
+    fontFamily: THEME.fonts.semibold,
     color: '#C0392B',
     fontSize: 12,
-    fontWeight: '800',
+  },
+  confirmBox: {
+    backgroundColor: '#FDEDEC',
+    borderWidth: 1,
+    borderColor: '#F5B7B1',
+    borderRadius: THEME.radius.md,
+    padding: 12,
+  },
+  confirmText: {
+    fontFamily: THEME.fonts.regular,
+    fontSize: 12,
+    color: THEME.colors.dark,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cancelResetBtn: {
+    flex: 1,
+    backgroundColor: THEME.colors.white,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    paddingVertical: 10,
+    borderRadius: THEME.radius.md,
+    alignItems: 'center',
+  },
+  cancelResetText: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 12,
+    color: THEME.colors.dark,
+  },
+  confirmResetBtn: {
+    flex: 1,
+    backgroundColor: '#C0392B',
+    paddingVertical: 10,
+    borderRadius: THEME.radius.md,
+    alignItems: 'center',
+  },
+  confirmResetText: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 12,
+    color: THEME.colors.white,
+  },
+  inactiveHabitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: THEME.colors.surfaceLow,
+    borderRadius: THEME.radius.md,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    padding: 12,
+    marginBottom: 8,
+    gap: 10,
+  },
+  inactiveHabitInfo: {
+    flex: 1,
+  },
+  inactiveHabitName: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 13,
+    color: THEME.colors.dark,
+  },
+  inactiveHabitMeta: {
+    fontFamily: THEME.fonts.regular,
+    fontSize: 11,
+    color: THEME.colors.muted,
+    marginTop: 2,
+  },
+  longPauseTag: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 11,
+    color: THEME.colors.aquaDark,
+    marginTop: 4,
+  },
+  inactiveActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  resumeSmallBtn: {
+    backgroundColor: THEME.colors.aqua,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: THEME.radius.full,
+  },
+  resumeSmallBtnText: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 11,
+    color: THEME.colors.aquaDark,
+  },
+  viewSmallBtn: {
+    backgroundColor: THEME.colors.white,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: THEME.radius.full,
+  },
+  viewSmallBtnText: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 11,
+    color: THEME.colors.dark,
   },
 });

@@ -153,6 +153,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheetContainer: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     backgroundColor: THEME.colors.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -168,16 +171,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   badgeText: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    fontWeight: '800',
     color: THEME.colors.sage,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 4,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '900',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 21,
     color: THEME.colors.dark,
   },
   closeBtn: {
@@ -188,28 +191,30 @@ const styles = StyleSheet.create({
     borderColor: THEME.colors.border,
   },
   closeBtnText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 14,
-    fontWeight: '800',
     color: THEME.colors.muted,
   },
   scrollContent: {
     paddingBottom: 20,
   },
   inputLabel: {
-    fontSize: 12,
-    fontWeight: '800',
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 11,
     color: THEME.colors.dark,
     textTransform: 'uppercase',
     marginTop: 14,
     marginBottom: 6,
   },
   helperText: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 12,
     color: THEME.colors.muted,
     marginBottom: 8,
     lineHeight: 16,
   },
   input: {
+    fontFamily: THEME.fonts.regular,
     backgroundColor: THEME.colors.white,
     borderWidth: 1,
     borderColor: THEME.colors.border,
@@ -235,8 +240,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   chipText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    fontWeight: '600',
     color: THEME.colors.dark,
   },
   colorRow: {
@@ -257,9 +262,9 @@ const styles = StyleSheet.create({
     borderColor: THEME.colors.dark,
   },
   checkMark: {
+    fontFamily: THEME.fonts.semibold,
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '900',
   },
   anchorChipsRow: {
     flexDirection: 'row',
@@ -276,14 +281,14 @@ const styles = StyleSheet.create({
     borderRadius: THEME.radius.full,
   },
   anchorChipText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    fontWeight: '700',
     color: THEME.colors.dark,
   },
   saveBtn: {
-    backgroundColor: THEME.colors.sage,
+    backgroundColor: THEME.colors.coral,
     paddingVertical: 14,
-    borderRadius: THEME.radius.md,
+    borderRadius: THEME.radius.full,
     alignItems: 'center',
     marginTop: 24,
   },
@@ -291,8 +296,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   saveBtnText: {
+    fontFamily: THEME.fonts.semibold,
     color: '#FFF',
     fontSize: 15,
-    fontWeight: '800',
   },
 });

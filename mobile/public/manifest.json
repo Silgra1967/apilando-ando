@@ -1,13 +1,13 @@
 {
-  "name": "Apliando Ando",
-  "short_name": "Apliando",
+  "name": "Apilando Ando",
+  "short_name": "Apilando",
   "description": "Aplicación de hábitos y rutinas sostenibles con un enfoque amable, motivador y realista.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FAF7F2",
-  "theme_color": "#FAF7F2",
+  "background_color": "#F7FBF9",
+  "theme_color": "#F7FBF9",
   "lang": "es-419",
   "icons": [
     {

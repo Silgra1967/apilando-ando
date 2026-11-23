@@ -1,4 +1,4 @@
-# Apliando Ando — Especificación Técnica y Modelo de Datos
+# Apilando Ando — Especificación Técnica y Modelo de Datos
 
 > [!NOTE]
 > Este documento traduce las reglas de negocio y flujos acordados en [apliando-ando-concepto.md](file:///C:\Users\Jesus\.gemini\antigravity\brain\9fb9bce2-53ec-4f4d-a9a9-64470ca24844\apliando-ando-concepto.md) a una estructura de datos robusta, tipos de TypeScript y lógica determinística.

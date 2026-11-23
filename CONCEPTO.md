@@ -1,4 +1,4 @@
-# Apliando Ando — Documento Conceptual de la App de Hábitos
+# Apilando Ando — Documento Conceptual de la App de Hábitos
 
 > [!NOTE]
 > Este documento es una referencia viva de las decisiones de diseño y reglas de negocio. Se actualiza a medida que el concepto evoluciona.

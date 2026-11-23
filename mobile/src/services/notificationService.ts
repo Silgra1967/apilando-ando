@@ -88,26 +88,43 @@ export async function scheduleDailyReminder(timeStr: string = '20:00'): Promise<
 }
 
 /**
- * Programa la alerta matutina de escudo si el día anterior quedó pendiente
+ * Cancela cualquier alerta de escudo pendiente programada
  */
-export async function scheduleShieldAlert(habitName: string): Promise<void> {
+export async function cancelShieldAlerts(): Promise<void> {
   try {
-    const hasPermission = await requestNotificationPermissions();
-    if (!hasPermission) return;
-
-    // Cancelar alertas de escudo previas
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const notif of scheduled) {
       if (notif.content.data?.type === 'shield_alert') {
         await Notifications.cancelScheduledNotificationAsync(notif.identifier);
       }
     }
+  } catch (err) {
+    console.warn('Error cancelando alertas de escudo:', err);
+  }
+}
 
-    // Notificar a las 9:00 AM del día actual
+/**
+ * Programa la alerta matutina (09:00) de escudo si el día anterior quedó pendiente
+ */
+export async function scheduleShieldAlert(habitNames: string | string[]): Promise<void> {
+  try {
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) return;
+
+    await cancelShieldAlerts();
+
+    const names = Array.isArray(habitNames) ? habitNames : [habitNames];
+    if (names.length === 0) return;
+
+    const body =
+      names.length === 1
+        ? `Ayer no registraste "${names[0]}". Podés usar tu escudo para proteger tu racha hoy.`
+        : `Ayer quedaron ${names.length} hábitos sin registrar. Podés usar tus escudos hoy antes de las 23:59.`;
+
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: '🛡️ Tenés un escudo disponible',
-        body: `Ayer no registraste "${habitName}". Podés usar tu escudo para proteger tu racha hoy.`,
+        title: '🛡️ Tenés escudos disponibles',
+        body,
         data: { type: 'shield_alert' },
       },
       trigger: {
@@ -131,7 +148,7 @@ export async function sendInstantTestNotification(): Promise<void> {
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: '🌱 Apliando Ando',
+        title: '🌱 Apilando Ando',
         body: '¡Las notificaciones están funcionando perfectamente en tu celular!',
       },
       trigger: null, // Inmediata

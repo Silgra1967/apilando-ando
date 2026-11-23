@@ -41,4 +41,20 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   soundEnabled: boolean;
   onboardingCompleted: boolean;
+  lastMonthlyReviewDismissed?: string; // Formato YYYY-MM
+}
+
+/**
+ * Determina si un hábito en mantenimiento ya cumplió 6 meses para graduarse a Ancla.
+ */
+export function isEligibleForAnchorGraduation(
+  habit: Habit,
+  currentDate: Date = new Date()
+): boolean {
+  if (habit.status !== 'maintenance' || !habit.promotedToMaintenanceAt) return false;
+  const promotedDate = new Date(habit.promotedToMaintenanceAt);
+  const diffInMonths =
+    (currentDate.getFullYear() - promotedDate.getFullYear()) * 12 +
+    (currentDate.getMonth() - promotedDate.getMonth());
+  return diffInMonths >= 6;
 }

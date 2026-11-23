@@ -80,21 +80,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   badge: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    fontWeight: '800',
     color: THEME.colors.sage,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 6,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '900',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 19,
     color: THEME.colors.dark,
     textAlign: 'center',
     marginBottom: 12,
   },
   description: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 13,
     color: THEME.colors.dark,
     textAlign: 'center',
@@ -102,22 +103,22 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   bold: {
-    fontWeight: '800',
+    fontFamily: THEME.fonts.semibold,
     color: THEME.colors.dark,
   },
   primaryBtn: {
-    backgroundColor: THEME.colors.sage,
+    backgroundColor: THEME.colors.coral,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: THEME.radius.md,
+    borderRadius: THEME.radius.full,
     width: '100%',
     alignItems: 'center',
     marginBottom: 10,
   },
   primaryBtnText: {
+    fontFamily: THEME.fonts.semibold,
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '800',
   },
   secondaryBtn: {
     paddingVertical: 10,
@@ -126,8 +127,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryBtnText: {
+    fontFamily: THEME.fonts.medium,
     color: THEME.colors.muted,
     fontSize: 13,
-    fontWeight: '700',
   },
 });

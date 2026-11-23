@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Apliando Ando",
-    "slug": "apliando-ando",
+    "name": "Apilando Ando",
+    "slug": "apilando-ando",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,14 +20,17 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "name": "Apliando Ando",
-      "shortName": "Apliando",
+      "name": "Apilando Ando",
+      "shortName": "Apilando",
       "lang": "es",
       "display": "standalone",
       "orientation": "portrait",
-      "backgroundColor": "#FAF7F2",
+      "backgroundColor": "#F7FBF9",
       "startUrl": "/",
       "scope": "/"
-    }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

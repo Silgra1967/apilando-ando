@@ -1,4 +1,4 @@
-# Directivas del Proyecto — Apliando Ando
+# Directivas del Proyecto — Apilando Ando
 
 Este archivo define las directivas globales del repositorio `apliando-ando`. Complementa a [`mobile/AGENTS.md`](./mobile/AGENTS.md) (específico de Expo/React Native).
 
@@ -52,7 +52,7 @@ Antes de modificar lógica de hábitos, rachas, escudos o pantallas, respetar lo
 ## 5. PWA Web, Pantalla Completa y Política de Caché
 
 - **Instalable en pantalla completa:**
-  - `mobile/public/manifest.json` define `display: "standalone"`, `short_name: "Apliando"`, colores del tema (`#FAF7F2`) e íconos PNG de `192x192` y `512x512` (`mobile/public/icons/`).
+  - `mobile/public/manifest.json` define `display: "standalone"`, `short_name: "Apilando"`, colores del tema (`#F7FBF9`) e íconos PNG de `192x192` y `512x512` (`mobile/public/icons/`).
   - `mobile/public/index.html` incluye `viewport-fit=cover`, `theme-color`, `apple-mobile-web-app-capable`, `mobile-web-app-capable`, `apple-touch-icon` (`180x180`) y `<link rel="manifest" href="/manifest.json" />`.
   - Mantener sincronizada la configuración web en `mobile/app.json` (sin duplicar `themeColor` en `app.json` para que no se inyecte dos veces junto al meta tag de `mobile/public/index.html`).
 - **Política estricta contra caché vieja (sin Service Worker por ahora):**

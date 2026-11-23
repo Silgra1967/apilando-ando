@@ -194,6 +194,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheetContainer: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     backgroundColor: THEME.colors.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -209,22 +212,22 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   badgeText: {
+    fontFamily: THEME.fonts.semibold,
     fontSize: 11,
-    fontWeight: '800',
     color: THEME.colors.terracotta,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 4,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '900',
+    fontFamily: THEME.fonts.medium,
+    fontSize: 21,
     color: THEME.colors.dark,
   },
   countText: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 12,
     color: THEME.colors.muted,
-    fontWeight: '600',
     marginTop: 3,
   },
   closeBtn: {
@@ -235,8 +238,8 @@ const styles = StyleSheet.create({
     borderColor: THEME.colors.border,
   },
   closeBtnText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 14,
-    fontWeight: '800',
     color: THEME.colors.muted,
   },
   filterRow: {
@@ -257,8 +260,8 @@ const styles = StyleSheet.create({
     borderColor: THEME.colors.dark,
   },
   filterChipText: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    fontWeight: '700',
     color: THEME.colors.dark,
   },
   filterChipTextActive: {
@@ -313,19 +316,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   stickerName: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    fontWeight: '800',
     color: THEME.colors.dark,
     textAlign: 'center',
   },
   stickerNameLocked: {
+    fontFamily: THEME.fonts.regular,
     color: THEME.colors.muted,
-    fontWeight: '600',
   },
   stickerMeta: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 9,
     color: THEME.colors.muted,
-    fontWeight: '600',
     marginTop: 2,
   },
   detailCard: {
@@ -349,17 +352,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   detailTitle: {
+    fontFamily: THEME.fonts.medium,
     fontSize: 15,
-    fontWeight: '800',
     color: THEME.colors.dark,
   },
   detailStatus: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 11,
     color: THEME.colors.muted,
     marginTop: 2,
-    fontWeight: '600',
   },
   detailLore: {
+    fontFamily: THEME.fonts.regular,
     fontSize: 12,
     fontStyle: 'italic',
     color: THEME.colors.dark,

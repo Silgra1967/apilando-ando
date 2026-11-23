@@ -1,10 +1,10 @@
-# Apliando Ando 🌱
+# Apilando Ando 🌱
 
 > Una aplicación de hábitos y rutinas sostenibles construida con un enfoque amable, motivador y realista.
 
 ## 💡 Filosofía Central
 
-Apliando Ando se enfoca en la constancia a largo plazo mediante tres principios clave:
+Apilando Ando se enfoca en la constancia a largo plazo mediante tres principios clave:
 1. **Un solo hábito en construcción activa a la vez:** Para evitar la frustración y el abandono por saturación, consolidamos un hábito antes de sumar el siguiente.
 2. **Habit Stacking (Anclas naturales):** Conectamos el hábito nuevo a rutinas que el usuario ya realiza de forma automática.
 3. **Escudos de protección (2 días de gracia):** Cuidan las rachas si la vida se interpone, con confirmación consciente y reposición a través de hitos.
