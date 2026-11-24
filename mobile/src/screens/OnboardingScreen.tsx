@@ -46,13 +46,13 @@ export const OnboardingScreen: React.FC = () => {
     {
       ...t.onboarding.presets[0],
       bg: colors.lima,
-      iconColor: colors.limaDark,
+      iconColor: colors.onLima,
       icon: 'coffee' as const,
     },
     {
       ...t.onboarding.presets[1],
       bg: colors.aqua,
-      iconColor: colors.aquaDark,
+      iconColor: colors.onAqua,
       icon: 'leaf' as const,
     },
     {
@@ -357,10 +357,10 @@ export const OnboardingScreen: React.FC = () => {
                 {revelationStep === 1 && (
                   <View style={[styles.ruleCard, styles.ruleCardLima]}>
                     <View style={[styles.ruleIconCircle, { backgroundColor: colors.lima }]}>
-                      <Sprout size={28} color={colors.limaDark} />
+                      <Sprout size={28} color={colors.onLima} />
                     </View>
                     <View style={[styles.ruleBadgePill, { backgroundColor: colors.lima }]}>
-                      <Text style={[styles.ruleBadgeText, { color: colors.limaDark }]}>
+                      <Text style={[styles.ruleBadgeText, { color: colors.onLima }]}>
                         REGLA 1 DE 3 · 🌱 FOCO PLENO
                       </Text>
                     </View>
@@ -399,10 +399,10 @@ export const OnboardingScreen: React.FC = () => {
                 {revelationStep === 3 && (
                   <View style={[styles.ruleCard, styles.ruleCardAqua]}>
                     <View style={[styles.ruleIconCircle, { backgroundColor: colors.aqua }]}>
-                      <Calendar size={28} color={colors.aquaDark} />
+                      <Calendar size={28} color={colors.onAqua} />
                     </View>
                     <View style={[styles.ruleBadgePill, { backgroundColor: colors.aqua }]}>
-                      <Text style={[styles.ruleBadgeText, { color: colors.aquaDark }]}>
+                      <Text style={[styles.ruleBadgeText, { color: colors.onAqua }]}>
                         REGLA 3 DE 3 · 🌿 MANTENIMIENTO
                       </Text>
                     </View>
@@ -666,7 +666,7 @@ const createStyles = (colors: ThemeColors) =>
   },
   chipTextActive: {
     fontFamily: THEME.fonts.semibold,
-    color: colors.limaDark,
+    color: colors.onLima,
   },
   sectionLabel: {
     fontFamily: THEME.fonts.semibold,

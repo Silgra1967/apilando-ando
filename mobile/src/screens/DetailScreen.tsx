@@ -854,7 +854,7 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
   promoteBtnText: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 14,
-    color: colors.limaDark,
+    color: colors.onLima,
   },
   promoteBtnDisabled: {
     backgroundColor: colors.surfaceContainer,

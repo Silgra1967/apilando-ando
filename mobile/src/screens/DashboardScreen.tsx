@@ -266,7 +266,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               return (
                 <View key={m.id} style={styles.stackRow}>
                   <View style={styles.nodeMaintenance}>
-                    <Leaf size={17} color={colors.aquaDark} />
+                    <Leaf size={17} color={colors.onAqua} />
                   </View>
                   <View style={styles.maintenanceCard}>
                     <TouchableOpacity
@@ -316,7 +316,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             {activeHabit && (
               <View style={styles.stackRow}>
                 <View style={styles.nodeActive}>
-                  <Sprout size={19} color={colors.limaDark} />
+                  <Sprout size={19} color={colors.onLima} />
                 </View>
 
                 <View style={styles.activeCard}>
@@ -411,7 +411,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     {isCompletedToday(activeHabit.id) && (
                       <Check
                         size={18}
-                        color={colors.limaDark}
+                        color={colors.onLima}
                         strokeWidth={2.6}
                       />
                     )}
@@ -434,7 +434,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             {!activeHabit && (
               <View style={styles.stackRow}>
                 <View style={styles.nodeActive}>
-                  <Sprout size={19} color={colors.limaDark} />
+                  <Sprout size={19} color={colors.onLima} />
                 </View>
                 <TouchableOpacity style={styles.addHabitCard} onPress={onOpenAddHabit}>
                   <Text style={styles.addHabitIcon}>🌱</Text>
@@ -1065,7 +1065,7 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
     fontSize: 15,
   },
   bigCheckButtonTextDone: {
-    color: colors.limaDark,
+    color: colors.onLima,
   },
   addHabitCard: {
     flex: 1,

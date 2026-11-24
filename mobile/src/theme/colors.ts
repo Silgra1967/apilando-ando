@@ -20,9 +20,11 @@ export const LIGHT_COLORS = {
   lima: '#D6E85A',
   limaLight: '#F5FAD0',
   limaDark: '#3A4300',
+  onLima: '#3A4300',
   aqua: '#8FD6D3',
   aquaLight: '#EAF7F6',
   aquaDark: '#166664',
+  onAqua: '#166664',
 
   // Aliados de compatibilidad con componentes existentes
   sage: '#166664',
@@ -57,9 +59,11 @@ export const DARK_COLORS: typeof LIGHT_COLORS = {
   lima: '#C9DC4A',
   limaLight: '#283014',
   limaDark: '#E6F57E',
+  onLima: '#242B00',
   aqua: '#6EC2BE',
   aquaLight: '#173130',
   aquaDark: '#8FD6D3',
+  onAqua: '#0B2E2D',
 
   // Aliados de compatibilidad
   sage: '#7FD1CE',
