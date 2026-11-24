@@ -14,8 +14,12 @@ import {
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
-import { useHabitStore } from '../store/habitStore';
-import { scheduleDailyReminder } from '../services/notificationService';
+import { useHabitStore, areTodayCheckableHabitsCompleted } from '../store/habitStore';
+import {
+  scheduleDailyReminder,
+  cancelDailyReminders,
+  cancelShieldAlerts,
+} from '../services/notificationService';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -74,7 +78,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setReminderTime(time);
     await updateSettings({ reminderTime: time });
     if (notificationsEnabled) {
-      await scheduleDailyReminder(time);
+      const { habits: currentHabits, logs: currentLogs } = useHabitStore.getState();
+      await scheduleDailyReminder(
+        time,
+        areTodayCheckableHabitsCompleted(currentHabits, currentLogs)
+      );
     }
   };
 
@@ -82,7 +90,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setNotificationsEnabled(val);
     await updateSettings({ notificationsEnabled: val });
     if (val) {
-      await scheduleDailyReminder(reminderTime);
+      const { habits: currentHabits, logs: currentLogs } = useHabitStore.getState();
+      await scheduleDailyReminder(
+        reminderTime,
+        areTodayCheckableHabitsCompleted(currentHabits, currentLogs)
+      );
+    } else {
+      await cancelDailyReminders();
+      await cancelShieldAlerts();
     }
   };
 

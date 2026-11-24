@@ -9,7 +9,7 @@ import {
   PlusJakartaSans_600SemiBold,
   PlusJakartaSans_700Bold,
 } from '@expo-google-fonts/plus-jakarta-sans';
-import { useHabitStore } from './src/store/habitStore';
+import { useHabitStore, areTodayCheckableHabitsCompleted } from './src/store/habitStore';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { DetailScreen } from './src/screens/DetailScreen';
@@ -29,6 +29,7 @@ import { useAppTheme } from './src/theme/useAppTheme';
 import { useTranslation } from './src/i18n/translations';
 import {
   scheduleDailyReminder,
+  cancelDailyReminders,
   scheduleShieldAlert,
   cancelShieldAlerts,
 } from './src/services/notificationService';
@@ -72,7 +73,11 @@ function AppContent() {
   useEffect(() => {
     if (isLoaded && settings.onboardingCompleted) {
       if (settings.notificationsEnabled) {
-        scheduleDailyReminder(settings.reminderTime || '20:00');
+        const { habits: currentHabits, logs: currentLogs } = useHabitStore.getState();
+        const allTodayDone = areTodayCheckableHabitsCompleted(currentHabits, currentLogs);
+        scheduleDailyReminder(settings.reminderTime || '20:00', allTodayDone);
+      } else {
+        cancelDailyReminders();
       }
 
       // Comprobar automáticamente si ayer faltó tildar y hay escudos (activo + mantenimiento)

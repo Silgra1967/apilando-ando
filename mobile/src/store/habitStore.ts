@@ -2,6 +2,25 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit, DailyLog, AppSettings, HabitStatus } from '../types/habit';
 import { MilestoneCelebrationData } from '../components/MilestoneCelebrationModal';
+import { scheduleDailyReminder } from '../services/notificationService';
+
+export function toLocalDateStr(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate()
+  ).padStart(2, '0')}`;
+}
+
+export function areTodayCheckableHabitsCompleted(
+  habits: Habit[],
+  logs: Record<string, DailyLog>
+): boolean {
+  const todayStr = toLocalDateStr(new Date());
+  const checkable = habits.filter((h) => h.status === 'active' || h.status === 'maintenance');
+  return (
+    checkable.length > 0 &&
+    checkable.every((h) => logs[`${h.id}_${todayStr}`]?.status === 'completed')
+  );
+}
 
 interface HabitStore {
   habits: Habit[];
@@ -233,6 +252,14 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits)),
       AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs)),
     ]);
+
+    const { settings } = get();
+    if (settings.notificationsEnabled && dateStr === toLocalDateStr(new Date())) {
+      void scheduleDailyReminder(
+        settings.reminderTime || '20:00',
+        areTodayCheckableHabitsCompleted(updatedHabits, updatedLogs)
+      );
+    }
 
     return celebrationResult;
   },
@@ -486,23 +513,30 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     if (checkableHabits.length === 0) return null;
 
     const now = new Date();
+    const todayStr = toLocalDateStr(now);
+
     // Ayer
-    const yesterday = new Date(Date.now() - 86400000);
-    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yesterdayStr = toLocalDateStr(yesterday);
 
     // Anteayer
-    const dayBefore = new Date(Date.now() - 86400000 * 2);
-    const dayBeforeStr = `${dayBefore.getFullYear()}-${String(dayBefore.getMonth() + 1).padStart(2, '0')}-${String(dayBefore.getDate()).padStart(2, '0')}`;
+    const dayBefore = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+    const dayBeforeStr = toLocalDateStr(dayBefore);
 
     // 1. Expiración estricta a las 23:59 del día siguiente para hábitos activos y en mantenimiento
+    // Solo aplica si el hábito ya existía anteayer (dayBeforeStr >= createdDateStr)
     let expiredAny = false;
     const updatedAfterExpiration = habits.map((h) => {
       if (h.status !== 'active' && h.status !== 'maintenance') return h;
+      const createdDateStr = toLocalDateStr(new Date(h.createdAt));
+      if (dayBeforeStr < createdDateStr) return h;
+
       const dayBeforeLog = logs[`${h.id}_${dayBeforeStr}`];
+      const yesterdayLog = logs[`${h.id}_${yesterdayStr}`];
       if (
         (!dayBeforeLog || dayBeforeLog.status === 'missed') &&
-        h.currentStreak > 0 &&
-        now.getTime() - dayBefore.getTime() > 86400000 * 2
+        (!yesterdayLog || yesterdayLog.status === 'missed') &&
+        h.currentStreak > 0
       ) {
         expiredAny = true;
         return { ...h, currentStreak: 0 };
@@ -516,12 +550,19 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     }
 
     // 2. Detección agrupada de escudos pendientes de ayer (active primero, luego maintenance)
+    // Nunca ofrecer protección para un día anterior a la creación del hábito ni sin racha previa a hoy
     const pendingHabits = updatedAfterExpiration
       .filter((h) => h.status === 'active' || h.status === 'maintenance')
       .sort((a, b) => (a.status === 'active' ? -1 : b.status === 'active' ? 1 : 0))
       .filter((h) => {
+        const createdDateStr = toLocalDateStr(new Date(h.createdAt));
+        if (yesterdayStr < createdDateStr) return false;
+
         const yesterdayLog = logs[`${h.id}_${yesterdayStr}`];
-        return !yesterdayLog && h.shieldsAvailable > 0 && h.currentStreak > 0;
+        const todayCompleted = logs[`${h.id}_${todayStr}`]?.status === 'completed';
+        const streakBeforeToday = todayCompleted ? h.currentStreak - 1 : h.currentStreak;
+
+        return !yesterdayLog && h.shieldsAvailable > 0 && streakBeforeToday > 0;
       });
 
     if (pendingHabits.length > 0) {
