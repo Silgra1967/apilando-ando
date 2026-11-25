@@ -79,8 +79,26 @@ export function areTodayCheckableHabitsCompleted(
   const todayStr = toLocalDateStr(new Date());
   const checkable = habits.filter((h) => h.status === 'active' || h.status === 'maintenance');
   return (
-    checkable.length > 0 &&
+    checkable.length === 0 ||
     checkable.every((h) => logs[`${h.id}_${todayStr}`]?.status === 'completed')
+  );
+}
+
+function syncDailyReminderFromState(
+  habits: Habit[],
+  logs: Record<string, DailyLog>,
+  settings: AppSettings
+): void {
+  if (!settings.notificationsEnabled || !settings.onboardingCompleted) return;
+  const hasCheckable = habits.some((h) => h.status === 'active' || h.status === 'maintenance');
+  if (!hasCheckable) {
+    void cancelDailyReminders();
+    return;
+  }
+  void scheduleDailyReminder(
+    settings.reminderTime || '20:00',
+    areTodayCheckableHabitsCompleted(habits, logs),
+    settings.language || 'es'
   );
 }
 
@@ -338,12 +356,8 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     ]);
 
     const { settings } = get();
-    if (settings.notificationsEnabled && dateStr === toLocalDateStr(new Date())) {
-      void scheduleDailyReminder(
-        settings.reminderTime || '20:00',
-        areTodayCheckableHabitsCompleted(updatedHabits, updatedLogs),
-        settings.language || 'es'
-      );
+    if (dateStr === toLocalDateStr(new Date())) {
+      syncDailyReminderFromState(updatedHabits, updatedLogs, settings);
     }
 
     return celebrationResult;
@@ -520,6 +534,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
     set({ habits: updatedHabits });
     await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
+    syncDailyReminderFromState(updatedHabits, get().logs, get().settings);
   },
 
   addNewActiveHabit: async (name, color, anchorText) => {
@@ -550,6 +565,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     const updatedHabits = [...habits, newHabit];
     set({ habits: updatedHabits });
     await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
+    syncDailyReminderFromState(updatedHabits, get().logs, get().settings);
     return true;
   },
 
@@ -568,6 +584,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
     set({ habits: updatedHabits });
     await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
+    syncDailyReminderFromState(updatedHabits, get().logs, get().settings);
   },
 
   resumeHabit: async (habitId) => {
@@ -597,6 +614,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
     set({ habits: updatedHabits });
     await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
+    syncDailyReminderFromState(updatedHabits, get().logs, get().settings);
   },
 
   archiveHabit: async (habitId) => {
@@ -614,6 +632,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
     set({ habits: updatedHabits });
     await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
+    syncDailyReminderFromState(updatedHabits, get().logs, get().settings);
   },
 
   updateSettings: async (newSettings) => {

@@ -53,21 +53,38 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   }
 }
 
-/**
- * Cancela todos los recordatorios diarios programados
- */
-export async function cancelDailyReminders(): Promise<void> {
+// Cola secuencial para evitar condiciones de carrera entre cancelación y programación
+let reminderQueue: Promise<void> = Promise.resolve();
+
+function enqueueReminderTask(task: () => Promise<void>): Promise<void> {
+  const next = reminderQueue.then(task, task);
+  reminderQueue = next.catch(() => {});
+  return next;
+}
+
+async function cancelDailyRemindersInternal(): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const notif of scheduled) {
-      if (notif.content.data?.type === 'daily_reminder') {
+      const notifType = notif.content.data?.type;
+      const isDailyByData = notifType === 'daily_reminder';
+      const isDailyById = notif.identifier.startsWith('daily_reminder_');
+      const isLegacyWithoutType = !notifType;
+      if (isDailyByData || isDailyById || isLegacyWithoutType) {
         await Notifications.cancelScheduledNotificationAsync(notif.identifier);
       }
     }
   } catch (err) {
     console.warn('Error cancelando recordatorios diarios:', err);
   }
+}
+
+/**
+ * Cancela todos los recordatorios diarios programados
+ */
+export async function cancelDailyReminders(): Promise<void> {
+  return enqueueReminderTask(cancelDailyRemindersInternal);
 }
 
 /**
@@ -81,58 +98,62 @@ export async function scheduleDailyReminder(
   language: AppLanguage = 'es'
 ): Promise<void> {
   if (Platform.OS === 'web') return;
-  try {
-    const hasPermission = await requestNotificationPermissions();
-    if (!hasPermission) return;
+  return enqueueReminderTask(async () => {
+    try {
+      const hasPermission = await requestNotificationPermissions();
+      if (!hasPermission) return;
 
-    // Cancelar recordatorios diarios previos (incluido el de hoy si ya cumplió)
-    await cancelDailyReminders();
+      // Cancelar recordatorios diarios previos (incluido el de hoy si ya cumplió)
+      await cancelDailyRemindersInternal();
 
-    const [hoursStr, minutesStr] = timeStr.split(':');
-    const parsedHours = parseInt(hoursStr, 10);
-    const parsedMinutes = parseInt(minutesStr, 10);
-    const hours = Number.isNaN(parsedHours) ? 20 : parsedHours;
-    const minutes = Number.isNaN(parsedMinutes) ? 0 : parsedMinutes;
+      const [hoursStr, minutesStr] = timeStr.split(':');
+      const parsedHours = parseInt(hoursStr, 10);
+      const parsedMinutes = parseInt(minutesStr, 10);
+      const hours = Number.isNaN(parsedHours) ? 20 : parsedHours;
+      const minutes = Number.isNaN(parsedMinutes) ? 0 : parsedMinutes;
 
-    const now = new Date();
-    const DAYS_AHEAD = 14;
-    const notifTitle =
-      language === 'en' ? '🌱 Time for your routine' : '🌱 Momento de tu rutina';
-    const notifBody =
-      language === 'en'
-        ? 'Could you advance on your habits today? Take a calm moment to check in.'
-        : '¿Pudiste avanzar con tus hábitos hoy? Tomate un minuto para registrarlo.';
+      const now = new Date();
+      const DAYS_AHEAD = 14;
+      const notifTitle =
+        language === 'en' ? '🌱 Time for your routine' : '🌱 Momento de tu rutina';
+      const notifBody =
+        language === 'en'
+          ? 'Could you advance on your habits today? Take a calm moment to check in.'
+          : '¿Pudiste avanzar con tus hábitos hoy? Tomate un minuto para registrarlo.';
 
-    for (let offset = 0; offset < DAYS_AHEAD; offset++) {
-      if (offset === 0 && skipToday) continue;
+      for (let offset = 0; offset < DAYS_AHEAD; offset++) {
+        if (offset === 0 && skipToday) continue;
 
-      const targetDate = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() + offset,
-        hours,
-        minutes,
-        0,
-        0
-      );
+        const targetDate = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() + offset,
+          hours,
+          minutes,
+          0,
+          0
+        );
 
-      if (targetDate.getTime() <= now.getTime()) continue;
+        if (targetDate.getTime() <= now.getTime()) continue;
 
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: notifTitle,
-          body: notifBody,
-          data: { type: 'daily_reminder', dateStr: toLocalDateStr(targetDate) },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: targetDate,
-        },
-      });
+        const dateStr = toLocalDateStr(targetDate);
+        await Notifications.scheduleNotificationAsync({
+          identifier: `daily_reminder_${dateStr}`,
+          content: {
+            title: notifTitle,
+            body: notifBody,
+            data: { type: 'daily_reminder', dateStr },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: targetDate,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn('Error programando recordatorio diario:', err);
     }
-  } catch (err) {
-    console.warn('Error programando recordatorio diario:', err);
-  }
+  });
 }
 
 /**
