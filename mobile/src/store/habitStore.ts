@@ -1,13 +1,74 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Habit, DailyLog, AppSettings, HabitStatus } from '../types/habit';
+import {
+  Habit,
+  DailyLog,
+  AppSettings,
+  HabitStatus,
+  isEligibleForAnchorGraduation,
+  toLocalDateStr,
+} from '../types/habit';
 import { MilestoneCelebrationData } from '../components/MilestoneCelebrationModal';
-import { scheduleDailyReminder } from '../services/notificationService';
+import {
+  scheduleDailyReminder,
+  cancelDailyReminders,
+  cancelShieldAlerts,
+} from '../services/notificationService';
 
-export function toLocalDateStr(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate()
-  ).padStart(2, '0')}`;
+export { toLocalDateStr };
+
+function generateHabitId(): string {
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function unlockShieldSticker(stickers: string[]): string[] {
+  const label = '🛡️ Guardián Resiliente';
+  return stickers.includes(label) ? stickers : [...stickers, label];
+}
+
+function safeJsonParse<T>(
+  raw: string | null,
+  fallback: T,
+  isValid?: (val: unknown) => val is T
+): T {
+  if (!raw) return fallback;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (isValid && !isValid(parsed)) {
+      return fallback;
+    }
+    return parsed as T;
+  } catch (err) {
+    console.warn('Registro local corrupto, usando respaldo seguro:', err);
+    return fallback;
+  }
+}
+
+function isPlainRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function getEffectiveStartDateStr(habit: Habit): string {
+  const createdDateStr = toLocalDateStr(new Date(habit.createdAt));
+  if (!habit.resumedAt) return createdDateStr;
+  const resumedDateStr = toLocalDateStr(new Date(habit.resumedAt));
+  return resumedDateStr > createdDateStr ? resumedDateStr : createdDateStr;
+}
+
+async function safePersist(key: string, value: unknown): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    console.warn(`Error guardando ${key} en storage local:`, err);
+  }
+}
+
+async function safeRemove(key: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(key);
+  } catch (err) {
+    console.warn(`Error eliminando ${key} en storage local:`, err);
+  }
 }
 
 export function areTodayCheckableHabitsCompleted(
@@ -39,7 +100,7 @@ interface HabitStore {
   ) => Promise<void>;
   promoteToMaintenance: (habitId: string) => Promise<void>;
   graduateToAnchor: (habitId: string) => Promise<void>;
-  addNewActiveHabit: (name: string, color: string, anchorText?: string) => Promise<void>;
+  addNewActiveHabit: (name: string, color: string, anchorText?: string) => Promise<boolean>;
   toggleDayCompletion: (habitId: string, dateStr: string) => Promise<MilestoneCelebrationData | null>;
   useShield: (habitId: string, dateStr: string) => Promise<void>;
   resetStreak: (habitId: string) => Promise<void>;
@@ -77,6 +138,21 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'es',
 };
 
+const STREAK_MILESTONES: ReadonlyArray<{
+  streak: number;
+  title: string;
+  emoji: string;
+  stickerLabel: string;
+}> = [
+  { streak: 7, title: 'Semana Firme', emoji: '🔥', stickerLabel: '🔥 7 Días' },
+  { streak: 14, title: 'Ritmo Vivo', emoji: '⚡', stickerLabel: '⚡ 14 Días' },
+  { streak: 21, title: 'Hábito Consolidado', emoji: '🌿', stickerLabel: '🏆 Hábito 21 Días' },
+  { streak: 30, title: 'Mes Imparable', emoji: '🌙', stickerLabel: '🌙 Mes Imparable' },
+  { streak: 50, title: 'Mitad de Cien', emoji: '⭐', stickerLabel: '⭐ Mitad de Cien' },
+  { streak: 90, title: 'Trimestre Sólido', emoji: '💎', stickerLabel: '💎 90 Días' },
+  { streak: 100, title: 'Centenario Dorado', emoji: '👑', stickerLabel: '👑 Centenario Dorado' },
+];
+
 export const useHabitStore = create<HabitStore>((set, get) => ({
   habits: [],
   logs: {},
@@ -86,17 +162,39 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
   loadFromStorage: async () => {
     try {
       const [storedHabits, storedLogs, storedSettings] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.HABITS),
-        AsyncStorage.getItem(STORAGE_KEYS.LOGS),
-        AsyncStorage.getItem(STORAGE_KEYS.SETTINGS),
+        AsyncStorage.getItem(STORAGE_KEYS.HABITS).catch(() => null),
+        AsyncStorage.getItem(STORAGE_KEYS.LOGS).catch(() => null),
+        AsyncStorage.getItem(STORAGE_KEYS.SETTINGS).catch(() => null),
       ]);
 
+      const parsedHabits = safeJsonParse<Habit[]>(
+        storedHabits,
+        [],
+        (v): v is Habit[] => Array.isArray(v)
+      );
+      const parsedLogs = safeJsonParse<Record<string, DailyLog>>(
+        storedLogs,
+        {},
+        (v): v is Record<string, DailyLog> => isPlainRecord(v)
+      );
+      const parsedSettings = safeJsonParse<Partial<AppSettings>>(
+        storedSettings,
+        {},
+        (v): v is Partial<AppSettings> => isPlainRecord(v)
+      );
+
+      const mergedSettings: AppSettings = {
+        ...DEFAULT_SETTINGS,
+        ...parsedSettings,
+        // Si ya existen hábitos válidos pero settings se corrompió, no devolver al Onboarding
+        onboardingCompleted:
+          parsedSettings.onboardingCompleted ?? parsedHabits.length > 0,
+      };
+
       set({
-        habits: storedHabits ? JSON.parse(storedHabits) : [],
-        logs: storedLogs ? JSON.parse(storedLogs) : {},
-        settings: storedSettings
-          ? { ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) }
-          : DEFAULT_SETTINGS,
+        habits: parsedHabits,
+        logs: parsedLogs,
+        settings: mergedSettings,
         isLoaded: true,
       });
     } catch (e) {
@@ -106,8 +204,11 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
   },
 
   createInitialHabit: async (name, color, anchorText, reminderTime = '20:00', userName) => {
+    const { settings, habits } = get();
+    if (settings.onboardingCompleted && habits.length > 0) return;
+
     const newHabit: Habit = {
-      id: Date.now().toString(),
+      id: generateHabitId(),
       name: name.trim(),
       color,
       anchorText: anchorText?.trim() || undefined,
@@ -118,6 +219,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       shieldsAvailable: 2,
       createdAt: new Date().toISOString(),
       stickersUnlocked: ['🌱 Primer Paso'],
+      rewardedMilestones: [],
     };
 
     const newSettings: AppSettings = {
@@ -132,18 +234,22 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     set({ habits: updatedHabits, settings: newSettings });
 
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits)),
-      AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(newSettings)),
+      safePersist(STORAGE_KEYS.HABITS, updatedHabits),
+      safePersist(STORAGE_KEYS.SETTINGS, newSettings),
     ]);
   },
 
   toggleDayCompletion: async (habitId, dateStr) => {
+    const todayStr = toLocalDateStr(new Date());
+    // Regla invariable: sin registro retroactivo ni fechas futuras
+    if (dateStr !== todayStr) return null;
+
     const { habits, logs } = get();
     const logKey = `${habitId}_${dateStr}`;
     const currentLog = logs[logKey];
     const habit = habits.find((h) => h.id === habitId);
 
-    if (!habit) return null;
+    if (!habit || (habit.status !== 'active' && habit.status !== 'maintenance')) return null;
 
     let updatedLogs = { ...logs };
     let celebrationResult: MilestoneCelebrationData | null = null;
@@ -155,10 +261,12 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
         // Desmarcar
         delete updatedLogs[logKey];
         const newStreak = Math.max(0, h.currentStreak - 1);
+        const newTotal = Math.max(0, h.totalCompletedDays - 1);
         return {
           ...h,
           currentStreak: newStreak,
-          totalCompletedDays: Math.max(0, h.totalCompletedDays - 1),
+          bestStreak: newTotal === 0 ? 0 : h.bestStreak,
+          totalCompletedDays: newTotal,
         };
       } else {
         // Marcar completado
@@ -174,40 +282,19 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
         const newBest = Math.max(h.bestStreak, newStreak);
         const newTotal = h.totalCompletedDays + 1;
 
-        // Comprobar hitos y reposición de escudo (+1 si tiene menos de 3)
+        // Comprobar hitos y reposición de escudo (+1 si tiene menos de 3, una sola vez por hito)
         let newShields = h.shieldsAvailable;
         let shieldReplenished = false;
-        let milestoneMet = false;
-        let stickerName = '';
-        let stickerEmoji = '✨';
+        const baseRewarded =
+          h.rewardedMilestones ??
+          STREAK_MILESTONES.filter((m) => m.streak <= h.bestStreak).map((m) => m.streak);
+        const newRewardedMilestones = [...baseRewarded];
+        const newStickers = [...h.stickersUnlocked];
 
-        if (newStreak === 7) {
-          milestoneMet = true;
-          stickerName = 'Semana Firme';
-          stickerEmoji = '🔥';
-        } else if (newStreak === 14) {
-          milestoneMet = true;
-          stickerName = 'Ritmo Vivo';
-          stickerEmoji = '⚡';
-        } else if (newStreak === 21) {
-          milestoneMet = true;
-          stickerName = 'Hábito Consolidado';
-          stickerEmoji = '🌿';
-        } else if (newStreak === 30) {
-          milestoneMet = true;
-          stickerName = 'Mes Imparable';
-          stickerEmoji = '🌙';
-        } else if (newStreak === 50) {
-          milestoneMet = true;
-          stickerName = 'Mitad de Cien';
-          stickerEmoji = '⭐';
-        } else if (newStreak === 100) {
-          milestoneMet = true;
-          stickerName = 'Centenario Dorado';
-          stickerEmoji = '👑';
-        }
+        const matchedMilestone = STREAK_MILESTONES.find((m) => m.streak === newStreak);
+        if (matchedMilestone && !newRewardedMilestones.includes(newStreak)) {
+          newRewardedMilestones.push(newStreak);
 
-        if (milestoneMet) {
           if (newShields < 3) {
             newShields = Math.min(3, newShields + 1);
             shieldReplenished = true;
@@ -216,23 +303,18 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
           celebrationResult = {
             habitName: h.name,
             streak: newStreak,
-            stickerName,
-            stickerEmoji,
+            stickerName: matchedMilestone.title,
+            stickerEmoji: matchedMilestone.emoji,
             shieldReplenished,
             totalShields: newShields,
           };
         }
 
-        // Comprobar stickers ganados
-        let newStickers = [...h.stickersUnlocked];
-        if (newStreak >= 7 && !newStickers.includes('🔥 7 Días')) {
-          newStickers.push('🔥 7 Días');
-        }
-        if (newStreak >= 14 && !newStickers.includes('⚡ 14 Días')) {
-          newStickers.push('⚡ 14 Días');
-        }
-        if (newStreak >= 21 && !newStickers.includes('🏆 Hábito 21 Días')) {
-          newStickers.push('🏆 Hábito 21 Días');
+        // Asegurar stickers ganados para todos los hitos alcanzados
+        for (const milestone of STREAK_MILESTONES) {
+          if (newStreak >= milestone.streak && !newStickers.includes(milestone.stickerLabel)) {
+            newStickers.push(milestone.stickerLabel);
+          }
         }
 
         return {
@@ -242,6 +324,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
           totalCompletedDays: newTotal,
           shieldsAvailable: newShields,
           stickersUnlocked: newStickers,
+          rewardedMilestones: newRewardedMilestones,
         };
       }
     });
@@ -249,15 +332,16 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     set({ habits: updatedHabits, logs: updatedLogs });
 
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits)),
-      AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs)),
+      safePersist(STORAGE_KEYS.HABITS, updatedHabits),
+      safePersist(STORAGE_KEYS.LOGS, updatedLogs),
     ]);
 
     const { settings } = get();
     if (settings.notificationsEnabled && dateStr === toLocalDateStr(new Date())) {
       void scheduleDailyReminder(
         settings.reminderTime || '20:00',
-        areTodayCheckableHabitsCompleted(updatedHabits, updatedLogs)
+        areTodayCheckableHabitsCompleted(updatedHabits, updatedLogs),
+        settings.language || 'es'
       );
     }
 
@@ -266,13 +350,26 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
   useShield: async (habitId, dateStr) => {
     const { habits, logs } = get();
+    const targetHabit = habits.find((h) => h.id === habitId);
     const logKey = `${habitId}_${dateStr}`;
+    const existingLog = logs[logKey];
+
+    if (
+      !targetHabit ||
+      (targetHabit.status !== 'active' && targetHabit.status !== 'maintenance') ||
+      targetHabit.shieldsAvailable <= 0 ||
+      existingLog?.status === 'completed' ||
+      existingLog?.status === 'shielded'
+    ) {
+      return;
+    }
 
     const updatedHabits = habits.map((h) => {
       if (h.id === habitId && h.shieldsAvailable > 0) {
         return {
           ...h,
           shieldsAvailable: h.shieldsAvailable - 1,
+          stickersUnlocked: unlockShieldSticker(h.stickersUnlocked),
         };
       }
       return h;
@@ -292,8 +389,8 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     set({ habits: updatedHabits, logs: updatedLogs });
 
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits)),
-      AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs)),
+      safePersist(STORAGE_KEYS.HABITS, updatedHabits),
+      safePersist(STORAGE_KEYS.LOGS, updatedLogs),
     ]);
   },
 
@@ -310,7 +407,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     });
 
     set({ habits: updatedHabits });
-    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+    await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
   },
 
   resolveShieldDecisions: async (dateStr, protectedHabitIds, resetHabitIds) => {
@@ -319,10 +416,21 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     const resetSet = new Set(resetHabitIds);
     const updatedLogs = { ...logs };
     const nowISO = new Date().toISOString();
+    const todayStr = toLocalDateStr(new Date());
 
     const updatedHabits = habits.map((h) => {
+      if (h.status !== 'active' && h.status !== 'maintenance') return h;
+
+      const effectiveStartDateStr = getEffectiveStartDateStr(h);
+      if (dateStr < effectiveStartDateStr) return h;
+
+      const logKey = `${h.id}_${dateStr}`;
+      const existingLog = logs[logKey];
+      if (existingLog?.status === 'completed' || existingLog?.status === 'shielded') {
+        return h;
+      }
+
       if (protectSet.has(h.id) && h.shieldsAvailable > 0) {
-        const logKey = `${h.id}_${dateStr}`;
         updatedLogs[logKey] = {
           id: logKey,
           habitId: h.id,
@@ -333,10 +441,10 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
         return {
           ...h,
           shieldsAvailable: h.shieldsAvailable - 1,
+          stickersUnlocked: unlockShieldSticker(h.stickersUnlocked),
         };
       }
       if (resetSet.has(h.id)) {
-        const logKey = `${h.id}_${dateStr}`;
         updatedLogs[logKey] = {
           id: logKey,
           habitId: h.id,
@@ -344,9 +452,10 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
           status: 'missed',
           loggedAt: nowISO,
         };
+        const todayCompleted = logs[`${h.id}_${todayStr}`]?.status === 'completed';
         return {
           ...h,
-          currentStreak: 0,
+          currentStreak: todayCompleted ? 1 : 0,
         };
       }
       return h;
@@ -355,13 +464,16 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     set({ habits: updatedHabits, logs: updatedLogs });
 
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits)),
-      AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs)),
+      safePersist(STORAGE_KEYS.HABITS, updatedHabits),
+      safePersist(STORAGE_KEYS.LOGS, updatedLogs),
     ]);
   },
 
   promoteToMaintenance: async (habitId) => {
     const { habits } = get();
+    const target = habits.find((h) => h.id === habitId);
+    if (!target || target.status !== 'active' || target.currentStreak < 21) return;
+
     const updatedHabits = habits.map((h) => {
       if (h.id === habitId) {
         let newStickers = [...h.stickersUnlocked];
@@ -379,11 +491,14 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     });
 
     set({ habits: updatedHabits });
-    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+    await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
   },
 
   graduateToAnchor: async (habitId) => {
     const { habits } = get();
+    const target = habits.find((h) => h.id === habitId);
+    if (!target || !isEligibleForAnchorGraduation(target)) return;
+
     const updatedHabits = habits.map((h) => {
       if (h.id === habitId) {
         let newStickers = [...h.stickersUnlocked];
@@ -401,15 +516,22 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     });
 
     set({ habits: updatedHabits });
-    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+    await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
   },
 
   addNewActiveHabit: async (name, color, anchorText) => {
     const { habits } = get();
-    // Validar que no haya otro hábito activo actualmente (o si hay, asegurarse de que se maneje)
+    const trimmedName = name.trim();
+    if (!trimmedName) return false;
+
+    // Regla invariable: solo puede existir un hábito activo en construcción a la vez
+    if (habits.some((h) => h.status === 'active')) {
+      return false;
+    }
+
     const newHabit: Habit = {
-      id: Date.now().toString(),
-      name: name.trim(),
+      id: generateHabitId(),
+      name: trimmedName,
       color,
       anchorText: anchorText?.trim() || undefined,
       status: 'active',
@@ -419,11 +541,13 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       shieldsAvailable: 2,
       createdAt: new Date().toISOString(),
       stickersUnlocked: ['🌱 Nuevo Comienzo'],
+      rewardedMilestones: [],
     };
 
     const updatedHabits = [...habits, newHabit];
     set({ habits: updatedHabits });
-    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+    await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
+    return true;
   },
 
   pauseHabit: async (habitId) => {
@@ -440,17 +564,21 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     });
 
     set({ habits: updatedHabits });
-    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+    await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
   },
 
   resumeHabit: async (habitId) => {
     const { habits } = get();
     const target = habits.find((h) => h.id === habitId);
-    if (!target) return;
+    if (!target || target.status !== 'paused') return;
 
     const hasActive = habits.some((h) => h.status === 'active' && h.id !== habitId);
-    // Si ya hay un activo, vuelve a mantenimiento si ya fue promovido antes, o activo si no hay ninguno activo
-    const nextStatus: HabitStatus = hasActive ? 'maintenance' : (target.promotedToMaintenanceAt ? 'maintenance' : 'active');
+    // Preservar estado previo sin duplicar nunca un hábito activo
+    const nextStatus: HabitStatus = target.graduatedToAnchorAt
+      ? 'anchor'
+      : hasActive || target.promotedToMaintenanceAt
+      ? 'maintenance'
+      : 'active';
 
     const updatedHabits = habits.map((h) => {
       if (h.id === habitId) {
@@ -458,13 +586,14 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
           ...h,
           status: nextStatus,
           pausedAt: undefined,
+          resumedAt: new Date().toISOString(),
         };
       }
       return h;
     });
 
     set({ habits: updatedHabits });
-    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+    await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
   },
 
   archiveHabit: async (habitId) => {
@@ -481,21 +610,23 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     });
 
     set({ habits: updatedHabits });
-    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedHabits));
+    await safePersist(STORAGE_KEYS.HABITS, updatedHabits);
   },
 
   updateSettings: async (newSettings) => {
     const { settings } = get();
     const merged = { ...settings, ...newSettings };
     set({ settings: merged });
-    await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(merged));
+    await safePersist(STORAGE_KEYS.SETTINGS, merged);
   },
 
   resetAllData: async () => {
     await Promise.all([
-      AsyncStorage.removeItem(STORAGE_KEYS.HABITS),
-      AsyncStorage.removeItem(STORAGE_KEYS.LOGS),
-      AsyncStorage.removeItem(STORAGE_KEYS.SETTINGS),
+      safeRemove(STORAGE_KEYS.HABITS),
+      safeRemove(STORAGE_KEYS.LOGS),
+      safeRemove(STORAGE_KEYS.SETTINGS),
+      cancelDailyReminders(),
+      cancelShieldAlerts(),
     ]);
 
     set({
@@ -513,6 +644,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     if (checkableHabits.length === 0) return null;
 
     const now = new Date();
+    const nowISO = now.toISOString();
     const todayStr = toLocalDateStr(now);
 
     // Ayer
@@ -523,30 +655,79 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     const dayBefore = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
     const dayBeforeStr = toLocalDateStr(dayBefore);
 
-    // 1. Expiración estricta a las 23:59 del día siguiente para hábitos activos y en mantenimiento
-    // Solo aplica si el hábito ya existía anteayer (dayBeforeStr >= createdDateStr)
-    let expiredAny = false;
+    const isDayCovered = (log?: DailyLog) =>
+      log?.status === 'completed' || log?.status === 'shielded';
+
+    // 1. Expiración estricta a las 23:59 del día siguiente y cierre sin escudos para ayer
+    let habitsChanged = false;
+    let logsChanged = false;
+    const updatedLogs: Record<string, DailyLog> = { ...logs };
+
     const updatedAfterExpiration = habits.map((h) => {
       if (h.status !== 'active' && h.status !== 'maintenance') return h;
-      const createdDateStr = toLocalDateStr(new Date(h.createdAt));
-      if (dayBeforeStr < createdDateStr) return h;
+      const effectiveStartDateStr = getEffectiveStartDateStr(h);
 
-      const dayBeforeLog = logs[`${h.id}_${dayBeforeStr}`];
+      const todayCompleted = logs[`${h.id}_${todayStr}`]?.status === 'completed';
+      const baseTodayStreak = todayCompleted ? 1 : 0;
       const yesterdayLog = logs[`${h.id}_${yesterdayStr}`];
+      const dayBeforeLog = logs[`${h.id}_${dayBeforeStr}`];
+
+      let nextStreak = h.currentStreak;
+
+      // Caso A: Anteayer no fue cubierto (su ventana de gracia venció a las 23:59 de ayer)
+      if (dayBeforeStr >= effectiveStartDateStr && !isDayCovered(dayBeforeLog)) {
+        if (!isDayCovered(yesterdayLog)) {
+          if (nextStreak > baseTodayStreak) {
+            nextStreak = baseTodayStreak;
+          }
+        } else {
+          // Ayer sí se cubrió, pero la racha previa a ayer se cortó por el hueco de anteayer
+          const maxSinceYesterday =
+            (yesterdayLog?.status === 'completed' ? 1 : 0) + baseTodayStreak;
+          if (nextStreak > maxSinceYesterday) {
+            nextStreak = maxSinceYesterday;
+          }
+        }
+      }
+
+      // Caso B: Ayer no fue cubierto y el hábito no tiene escudos disponibles para protegerlo
       if (
-        (!dayBeforeLog || dayBeforeLog.status === 'missed') &&
-        (!yesterdayLog || yesterdayLog.status === 'missed') &&
-        h.currentStreak > 0
+        yesterdayStr >= effectiveStartDateStr &&
+        !isDayCovered(yesterdayLog) &&
+        h.shieldsAvailable <= 0
       ) {
-        expiredAny = true;
-        return { ...h, currentStreak: 0 };
+        if (nextStreak > baseTodayStreak) {
+          nextStreak = baseTodayStreak;
+        }
+        const yesterdayKey = `${h.id}_${yesterdayStr}`;
+        if (!updatedLogs[yesterdayKey] && h.currentStreak > baseTodayStreak) {
+          updatedLogs[yesterdayKey] = {
+            id: yesterdayKey,
+            habitId: h.id,
+            date: yesterdayStr,
+            status: 'missed',
+            loggedAt: nowISO,
+          };
+          logsChanged = true;
+        }
+      }
+
+      if (nextStreak !== h.currentStreak) {
+        habitsChanged = true;
+        return { ...h, currentStreak: nextStreak };
       }
       return h;
     });
 
-    if (expiredAny) {
-      set({ habits: updatedAfterExpiration });
-      await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updatedAfterExpiration));
+    if (habitsChanged || logsChanged) {
+      set({
+        ...(habitsChanged ? { habits: updatedAfterExpiration } : {}),
+        ...(logsChanged ? { logs: updatedLogs } : {}),
+      });
+      await Promise.all([
+        habitsChanged ? safePersist(STORAGE_KEYS.HABITS, updatedAfterExpiration) : Promise.resolve(),
+        logsChanged ? safePersist(STORAGE_KEYS.LOGS, updatedLogs) : Promise.resolve(),
+      ]);
     }
 
     // 2. Detección agrupada de escudos pendientes de ayer (active primero, luego maintenance)
@@ -555,11 +736,11 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       .filter((h) => h.status === 'active' || h.status === 'maintenance')
       .sort((a, b) => (a.status === 'active' ? -1 : b.status === 'active' ? 1 : 0))
       .filter((h) => {
-        const createdDateStr = toLocalDateStr(new Date(h.createdAt));
-        if (yesterdayStr < createdDateStr) return false;
+        const effectiveStartDateStr = getEffectiveStartDateStr(h);
+        if (yesterdayStr < effectiveStartDateStr) return false;
 
-        const yesterdayLog = logs[`${h.id}_${yesterdayStr}`];
-        const todayCompleted = logs[`${h.id}_${todayStr}`]?.status === 'completed';
+        const yesterdayLog = updatedLogs[`${h.id}_${yesterdayStr}`];
+        const todayCompleted = updatedLogs[`${h.id}_${todayStr}`]?.status === 'completed';
         const streakBeforeToday = todayCompleted ? h.currentStreak - 1 : h.currentStreak;
 
         return !yesterdayLog && h.shieldsAvailable > 0 && streakBeforeToday > 0;
@@ -590,13 +771,16 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
             bestStreak: Math.max(h.bestStreak, streak),
             totalCompletedDays: Math.max(h.totalCompletedDays, streak),
             shieldsAvailable: shields,
+            rewardedMilestones: STREAK_MILESTONES.filter((m) => m.streak <= streak).map(
+              (m) => m.streak
+            ),
           }
         : h
     );
     set({ habits: updated, logs: updatedLogs });
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated)),
-      AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs)),
+      safePersist(STORAGE_KEYS.HABITS, updated),
+      safePersist(STORAGE_KEYS.LOGS, updatedLogs),
     ]);
   },
 
@@ -619,7 +803,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
         : h
     );
     set({ habits: updated });
-    await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated));
+    await safePersist(STORAGE_KEYS.HABITS, updated);
   },
 
   simulateFullHistoryEnvironment: async () => {
@@ -757,8 +941,8 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
     set({ habits: allSimulatedHabits, logs: simulatedLogs });
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(allSimulatedHabits)),
-      AsyncStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(simulatedLogs)),
+      safePersist(STORAGE_KEYS.HABITS, allSimulatedHabits),
+      safePersist(STORAGE_KEYS.LOGS, simulatedLogs),
     ]);
   },
 }));

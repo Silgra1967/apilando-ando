@@ -1,16 +1,19 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { AppLanguage, toLocalDateStr } from '../types/habit';
 
-// Configuración de cómo se comporta la notificación si la app está en primer plano
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Configuración de cómo se comporta la notificación si la app está en primer plano (solo nativo)
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 /**
  * Solicita permisos de notificación al sistema operativo (Android/iOS)
@@ -50,12 +53,6 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   }
 }
 
-function toLocalDateStr(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate()
-  ).padStart(2, '0')}`;
-}
-
 /**
  * Cancela todos los recordatorios diarios programados
  */
@@ -80,7 +77,8 @@ export async function cancelDailyReminders(): Promise<void> {
  */
 export async function scheduleDailyReminder(
   timeStr: string = '20:00',
-  skipToday: boolean = false
+  skipToday: boolean = false,
+  language: AppLanguage = 'es'
 ): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
@@ -98,6 +96,12 @@ export async function scheduleDailyReminder(
 
     const now = new Date();
     const DAYS_AHEAD = 14;
+    const notifTitle =
+      language === 'en' ? '🌱 Time for your routine' : '🌱 Momento de tu rutina';
+    const notifBody =
+      language === 'en'
+        ? 'Could you advance on your habits today? Take a calm moment to check in.'
+        : '¿Pudiste avanzar con tus hábitos hoy? Tomate un minuto para registrarlo.';
 
     for (let offset = 0; offset < DAYS_AHEAD; offset++) {
       if (offset === 0 && skipToday) continue;
@@ -116,8 +120,8 @@ export async function scheduleDailyReminder(
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '🌱 Momento de tu rutina',
-          body: '¿Pudiste avanzar con tus hábitos hoy? Tomate un minuto para registrarlo.',
+          title: notifTitle,
+          body: notifBody,
           data: { type: 'daily_reminder', dateStr: toLocalDateStr(targetDate) },
         },
         trigger: {
@@ -135,6 +139,7 @@ export async function scheduleDailyReminder(
  * Cancela cualquier alerta de escudo pendiente programada
  */
 export async function cancelShieldAlerts(): Promise<void> {
+  if (Platform.OS === 'web') return;
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const notif of scheduled) {
@@ -148,9 +153,13 @@ export async function cancelShieldAlerts(): Promise<void> {
 }
 
 /**
- * Programa la alerta matutina (09:00) de escudo si el día anterior quedó pendiente
+ * Programa un único aviso hoy (antes de las 23:59) si ayer quedó pendiente de escudo
  */
-export async function scheduleShieldAlert(habitNames: string | string[]): Promise<void> {
+export async function scheduleShieldAlert(
+  habitNames: string | string[],
+  language: AppLanguage = 'es'
+): Promise<void> {
+  if (Platform.OS === 'web') return;
   try {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return;
@@ -160,21 +169,55 @@ export async function scheduleShieldAlert(habitNames: string | string[]): Promis
     const names = Array.isArray(habitNames) ? habitNames : [habitNames];
     if (names.length === 0) return;
 
+    const now = new Date();
+    const eveningTarget = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      20,
+      0,
+      0,
+      0
+    );
+    const endOfGraceWindow = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      30,
+      0,
+      0
+    );
+
+    let triggerDate: Date;
+    if (now.getTime() < eveningTarget.getTime()) {
+      triggerDate = eveningTarget;
+    } else if (now.getTime() < endOfGraceWindow.getTime()) {
+      triggerDate = new Date(now.getTime() + 15 * 60 * 1000);
+    } else {
+      return;
+    }
+
+    const title =
+      language === 'en' ? '🛡️ You have shields available' : '🛡️ Tenés escudos disponibles';
     const body =
-      names.length === 1
+      language === 'en'
+        ? names.length === 1
+          ? `You missed "${names[0]}" yesterday. You can use a shield today to protect your streak.`
+          : `${names.length} habits went unmarked yesterday. You can use your shields today before 23:59.`
+        : names.length === 1
         ? `Ayer no registraste "${names[0]}". Podés usar tu escudo para proteger tu racha hoy.`
         : `Ayer quedaron ${names.length} hábitos sin registrar. Podés usar tus escudos hoy antes de las 23:59.`;
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: '🛡️ Tenés escudos disponibles',
+        title,
         body,
-        data: { type: 'shield_alert' },
+        data: { type: 'shield_alert', dateStr: toLocalDateStr(now) },
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: 9,
-        minute: 0,
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
       },
     });
   } catch (err) {
@@ -186,6 +229,7 @@ export async function scheduleShieldAlert(habitNames: string | string[]): Promis
  * Envía una notificación de prueba inmediata (para que el usuario compruebe que funciona)
  */
 export async function sendInstantTestNotification(): Promise<void> {
+  if (Platform.OS === 'web') return;
   try {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return;

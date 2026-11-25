@@ -105,6 +105,16 @@ export const MILESTONE_STICKERS: MilestoneSticker[] = [
 export function findMilestoneSticker(nameOrEmoji?: string): MilestoneSticker | undefined {
   if (!nameOrEmoji) return undefined;
   return MILESTONE_STICKERS.find(
-    (s) => s.name === nameOrEmoji || s.emoji === nameOrEmoji || nameOrEmoji.includes(s.name)
+    (s) =>
+      s.name === nameOrEmoji ||
+      s.emoji === nameOrEmoji ||
+      nameOrEmoji.includes(s.name) ||
+      nameOrEmoji.includes(s.emoji) ||
+      (s.id === 'first_step' && nameOrEmoji.includes('Primer Paso')) ||
+      (s.id === 'streak_7' && nameOrEmoji.includes('7 Días')) ||
+      (s.id === 'streak_14' && nameOrEmoji.includes('14 Días')) ||
+      (s.id === 'streak_21' &&
+        (nameOrEmoji.includes('21 Días') || nameOrEmoji.includes('Consolidado'))) ||
+      (s.id === 'anchor_graduated' && nameOrEmoji.includes('Ancla'))
   );
 }

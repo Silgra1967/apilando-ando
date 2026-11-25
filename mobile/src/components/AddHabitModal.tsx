@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   StyleSheet,
   ScrollView,
   Platform,
+  ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
@@ -17,8 +19,9 @@ import { Habit } from '../types/habit';
 interface AddHabitModalProps {
   visible: boolean;
   onClose: () => void;
-  onAddHabit: (name: string, color: string, anchorText?: string) => void;
+  onAddHabit: (name: string, color: string, anchorText?: string) => Promise<boolean | void> | void;
   availableAnchors: Habit[]; // Hábitos existentes para usar como ancla opcional
+  hasActiveHabit?: boolean;
 }
 
 export const AddHabitModal: React.FC<AddHabitModalProps> = ({
@@ -26,28 +29,62 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
   onClose,
   onAddHabit,
   availableAnchors,
+  hasActiveHabit = false,
 }) => {
   const [name, setName] = useState('');
   const [color, setColor] = useState(THEME.palette[0].hex);
   const [anchorText, setAnchorText] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [blockedError, setBlockedError] = useState(false);
+  const submittingRef = useRef(false);
   const { colors } = useAppTheme();
   const { t, language } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const suggestions = t.onboarding.step2Suggestions;
 
-  const handleSave = () => {
-    if (!name.trim()) return;
-    onAddHabit(name.trim(), color, anchorText.trim() || undefined);
-    setName('');
-    setAnchorText('');
-    setColor(THEME.palette[0].hex);
-    onClose();
+  useEffect(() => {
+    if (visible) {
+      setBlockedError(false);
+      setIsSaving(false);
+      submittingRef.current = false;
+    }
+  }, [visible]);
+
+  const handleSave = async () => {
+    const trimmedName = name.trim();
+    if (!trimmedName || submittingRef.current || isSaving) return;
+    if (hasActiveHabit) {
+      setBlockedError(true);
+      return;
+    }
+
+    submittingRef.current = true;
+    setIsSaving(true);
+    setBlockedError(false);
+
+    try {
+      const result = await onAddHabit(trimmedName, color, anchorText.trim() || undefined);
+      if (result === false) {
+        setBlockedError(true);
+        return;
+      }
+      setName('');
+      setAnchorText('');
+      setColor(THEME.palette[0].hex);
+      onClose();
+    } finally {
+      submittingRef.current = false;
+      setIsSaving(false);
+    }
   };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={styles.sheetContainer}>
           <View style={styles.sheetHeader}>
             <View>
@@ -59,7 +96,11 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+          >
             <Text style={styles.inputLabel}>{t.modals.addTitle}</Text>
             <TextInput
               style={styles.input}
@@ -67,6 +108,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
               placeholderTextColor={colors.muted}
               value={name}
               onChangeText={setName}
+              maxLength={60}
             />
 
             {/* Sugerencias rápidas */}
@@ -132,19 +174,33 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({
               placeholderTextColor={colors.muted}
               value={anchorText}
               onChangeText={setAnchorText}
+              maxLength={80}
             />
+
+            {(blockedError || hasActiveHabit) && (
+              <View style={styles.blockedBox}>
+                <Text style={styles.blockedText}>{t.modals.addBlockedActive}</Text>
+              </View>
+            )}
 
             {/* Botón Guardar */}
             <TouchableOpacity
-              style={[styles.saveBtn, !name.trim() && styles.saveBtnDisabled]}
+              style={[
+                styles.saveBtn,
+                (!name.trim() || isSaving || hasActiveHabit) && styles.saveBtnDisabled,
+              ]}
               onPress={handleSave}
-              disabled={!name.trim()}
+              disabled={!name.trim() || isSaving || hasActiveHabit}
             >
-              <Text style={styles.saveBtnText}>{t.modals.addBtn}</Text>
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={styles.saveBtnText}>{t.modals.addBtn}</Text>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -303,5 +359,20 @@ const createStyles = (colors: ThemeColors) =>
     fontFamily: THEME.fonts.semibold,
     color: '#FFF',
     fontSize: 15,
+  },
+  blockedBox: {
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: THEME.radius.md,
+    backgroundColor: colors.coralLight,
+    borderWidth: 1,
+    borderColor: colors.coral,
+  },
+  blockedText: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 12,
+    color: colors.coralDark,
+    lineHeight: 17,
   },
 });

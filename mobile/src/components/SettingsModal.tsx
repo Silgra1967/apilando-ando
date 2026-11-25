@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ScrollView,
   Platform,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
@@ -52,9 +53,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [reminderTime, setReminderTime] = useState(settings.reminderTime || '20:00');
   const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notificationsEnabled);
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [labExpanded, setLabExpanded] = useState(false);
+  const [confirmingEcosystem, setConfirmingEcosystem] = useState(false);
+  const nameSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeHabit = habits.find((h) => h.status === 'active');
   const pausedHabits = habits.filter((h) => h.status === 'paused');
   const archivedHabits = habits.filter((h) => h.status === 'archived');
+
+  useEffect(() => {
+    if (visible) {
+      setUserName(settings.userName || '');
+      setReminderTime(settings.reminderTime || '20:00');
+      setNotificationsEnabled(settings.notificationsEnabled);
+      setConfirmingReset(false);
+      setConfirmingEcosystem(false);
+      setLabExpanded(false);
+    }
+    return () => {
+      if (nameSaveTimerRef.current) {
+        clearTimeout(nameSaveTimerRef.current);
+        nameSaveTimerRef.current = null;
+      }
+    };
+  }, [visible]);
+
+  const flushUserName = (valueToSave: string) => {
+    if (nameSaveTimerRef.current) {
+      clearTimeout(nameSaveTimerRef.current);
+      nameSaveTimerRef.current = null;
+    }
+    const normalized = valueToSave.trim() || undefined;
+    if (normalized !== settings.userName) {
+      void updateSettings({ userName: normalized });
+    }
+  };
 
   const getDaysPaused = (pausedAt?: string) => {
     if (!pausedAt) return 0;
@@ -62,7 +94,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleClose = () => {
+    flushUserName(userName);
     setConfirmingReset(false);
+    setConfirmingEcosystem(false);
     onClose();
   };
 
@@ -72,7 +106,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const times = ['07:00', '08:30', '13:00', '19:00', '20:00', '21:30', '22:00'];
+  const times = useMemo(() => {
+    const baseTimes = ['07:00', '08:30', '13:00', '18:00', '19:00', '20:00', '21:30', '22:00'];
+    if (reminderTime && !baseTimes.includes(reminderTime)) {
+      return [...baseTimes, reminderTime].sort();
+    }
+    return baseTimes;
+  }, [reminderTime]);
 
   const handleSelectTime = async (time: string) => {
     setReminderTime(time);
@@ -81,7 +121,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const { habits: currentHabits, logs: currentLogs } = useHabitStore.getState();
       await scheduleDailyReminder(
         time,
-        areTodayCheckableHabitsCompleted(currentHabits, currentLogs)
+        areTodayCheckableHabitsCompleted(currentHabits, currentLogs),
+        language
       );
     }
   };
@@ -93,7 +134,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const { habits: currentHabits, logs: currentLogs } = useHabitStore.getState();
       await scheduleDailyReminder(
         reminderTime,
-        areTodayCheckableHabitsCompleted(currentHabits, currentLogs)
+        areTodayCheckableHabitsCompleted(currentHabits, currentLogs),
+        language
       );
     } else {
       await cancelDailyReminders();
@@ -110,7 +152,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={styles.sheetContainer}>
           <View style={styles.header}>
             <View>
@@ -122,7 +167,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.content}
+          >
             {/* SECCIÓN APARIENCIA E IDIOMA */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t.settings.appearanceTitle}</Text>
@@ -134,10 +183,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 placeholder={t.settings.namePlaceholder}
                 placeholderTextColor={colors.outline}
                 value={userName}
+                maxLength={30}
                 onChangeText={(val) => {
                   setUserName(val);
-                  updateSettings({ userName: val.trim() || undefined });
+                  if (nameSaveTimerRef.current) {
+                    clearTimeout(nameSaveTimerRef.current);
+                  }
+                  nameSaveTimerRef.current = setTimeout(() => {
+                    updateSettings({ userName: val.trim() || undefined });
+                    nameSaveTimerRef.current = null;
+                  }, 400);
                 }}
+                onEndEditing={() => flushUserName(userName)}
+                onBlur={() => flushUserName(userName)}
               />
 
               <Text style={[styles.subLabel, { marginTop: 14 }]}>{t.settings.themeLabel}</Text>
@@ -323,57 +381,110 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </View>
             )}
 
-            {/* SIMULADOR RÁPIDO PARA PRUEBAS DE HITOS */}
-            {activeHabit && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t.settings.labTitle}</Text>
-                <Text style={styles.sectionSubtitle}>{t.settings.labSub}</Text>
-                <View style={styles.simRow}>
-                  <TouchableOpacity
-                    style={styles.simBtn}
-                    onPress={async () => {
-                      await setSimulatedStreak(activeHabit.id, 6, 1);
-                      notifyIfNative('6 days', t.settings.labDay6);
-                      handleClose();
-                    }}
-                  >
-                    <Text style={styles.simBtnText}>{t.settings.labDay6}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.simBtn}
-                    onPress={async () => {
-                      await setSimulatedStreak(activeHabit.id, 20, 1);
-                      notifyIfNative('20 days', t.settings.labDay20);
-                      handleClose();
-                    }}
-                  >
-                    <Text style={styles.simBtnText}>{t.settings.labDay20}</Text>
-                  </TouchableOpacity>
+            {/* SIMULADOR RÁPIDO PARA PRUEBAS DE HITOS (COLAPSABLE Y PROTEGIDO) */}
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={styles.labHeaderRow}
+                activeOpacity={0.75}
+                onPress={() => {
+                  setLabExpanded((prev) => !prev);
+                  setConfirmingEcosystem(false);
+                }}
+              >
+                <View style={styles.labHeaderTitleWrap}>
+                  <Text style={styles.sectionTitle}>{t.settings.labTitle}</Text>
                 </View>
+                <View style={styles.labTogglePill}>
+                  <Text style={styles.labToggleText}>
+                    {labExpanded ? t.settings.labToggleClose : t.settings.labToggleOpen}
+                  </Text>
+                </View>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.sixMonthsBtn}
-                  onPress={async () => {
-                    await simulateSixMonthsReady(activeHabit.id);
-                    notifyIfNative('6 months', t.settings.lab6Months);
-                    handleClose();
-                  }}
-                >
-                  <Text style={styles.simBtnText}>{t.settings.lab6Months}</Text>
-                </TouchableOpacity>
+              {labExpanded && (
+                <View style={styles.labBody}>
+                  <Text style={styles.sectionSubtitle}>{t.settings.labSub}</Text>
 
-                <TouchableOpacity
-                  style={styles.fullSimBtn}
-                  onPress={async () => {
-                    await simulateFullHistoryEnvironment();
-                    notifyIfNative('Demo', t.settings.labEcosystem);
-                    handleClose();
-                  }}
-                >
-                  <Text style={styles.fullSimBtnText}>{t.settings.labEcosystem}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+                  {!activeHabit && (
+                    <Text style={styles.labNoActiveHint}>{t.settings.labNoActiveHint}</Text>
+                  )}
+
+                  <View style={styles.simRow}>
+                    <TouchableOpacity
+                      style={[styles.simBtn, !activeHabit && styles.simBtnDisabled]}
+                      disabled={!activeHabit}
+                      onPress={async () => {
+                        if (!activeHabit) return;
+                        await setSimulatedStreak(activeHabit.id, 6, 1);
+                        notifyIfNative('6 days', t.settings.labDay6);
+                        handleClose();
+                      }}
+                    >
+                      <Text style={styles.simBtnText}>{t.settings.labDay6}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.simBtn, !activeHabit && styles.simBtnDisabled]}
+                      disabled={!activeHabit}
+                      onPress={async () => {
+                        if (!activeHabit) return;
+                        await setSimulatedStreak(activeHabit.id, 20, 1);
+                        notifyIfNative('20 days', t.settings.labDay20);
+                        handleClose();
+                      }}
+                    >
+                      <Text style={styles.simBtnText}>{t.settings.labDay20}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.sixMonthsBtn, !activeHabit && styles.simBtnDisabled]}
+                    disabled={!activeHabit}
+                    onPress={async () => {
+                      if (!activeHabit) return;
+                      await simulateSixMonthsReady(activeHabit.id);
+                      notifyIfNative('6 months', t.settings.lab6Months);
+                      handleClose();
+                    }}
+                  >
+                    <Text style={styles.simBtnText}>{t.settings.lab6Months}</Text>
+                  </TouchableOpacity>
+
+                  {!confirmingEcosystem ? (
+                    <TouchableOpacity
+                      style={styles.fullSimBtn}
+                      onPress={() => setConfirmingEcosystem(true)}
+                    >
+                      <Text style={styles.fullSimBtnText}>{t.settings.labEcosystem}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[styles.confirmBox, { marginTop: 10 }]}>
+                      <Text style={styles.confirmText}>{t.settings.labEcosystemConfirmText}</Text>
+                      <View style={styles.confirmActions}>
+                        <TouchableOpacity
+                          style={styles.cancelResetBtn}
+                          onPress={() => setConfirmingEcosystem(false)}
+                        >
+                          <Text style={styles.cancelResetText}>{t.settings.cancel}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.confirmEcoBtn}
+                          onPress={async () => {
+                            await simulateFullHistoryEnvironment();
+                            setConfirmingEcosystem(false);
+                            notifyIfNative('Demo', t.settings.labEcosystem);
+                            handleClose();
+                          }}
+                        >
+                          <Text style={styles.confirmEcoText}>
+                            {t.settings.labEcosystemConfirmBtn}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
 
             {/* SECCIÓN ZONA DE PRUEBAS / REINICIO */}
             <View style={styles.dangerSection}>
@@ -402,7 +513,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </View>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -620,6 +731,53 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
       fontSize: 12,
       color: colors.dark,
       textAlign: 'center',
+    },
+    labHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    labHeaderTitleWrap: {
+      flex: 1,
+    },
+    labTogglePill: {
+      backgroundColor: colors.lightGray,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: THEME.radius.full,
+    },
+    labToggleText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 11,
+      color: colors.dark,
+    },
+    labBody: {
+      marginTop: 10,
+    },
+    labNoActiveHint: {
+      fontFamily: THEME.fonts.regular,
+      fontSize: 11,
+      color: colors.muted,
+      marginBottom: 10,
+      lineHeight: 16,
+    },
+    simBtnDisabled: {
+      opacity: 0.45,
+    },
+    confirmEcoBtn: {
+      flex: 1,
+      backgroundColor: colors.dark,
+      paddingVertical: 10,
+      borderRadius: THEME.radius.md,
+      alignItems: 'center',
+    },
+    confirmEcoText: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 12,
+      color: colors.cream,
     },
     dangerTitle: {
       fontFamily: THEME.fonts.medium,

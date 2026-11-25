@@ -11,11 +11,12 @@ import {
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
-import { Habit, DailyLog } from '../types/habit';
+import { Habit, DailyLog, parseLocalDateStr } from '../types/habit';
 
 interface MonthlyReviewContentProps {
   habits: Habit[];
   logs: Record<string, DailyLog>;
+  currentDateKey?: string;
   onPromoteAndAddHabit: (habit: Habit) => void;
   embedded?: boolean;
   onClose?: () => void;
@@ -30,6 +31,7 @@ interface MonthlyReviewModalProps extends MonthlyReviewContentProps {
 export const MonthlyReviewContent: React.FC<MonthlyReviewContentProps> = ({
   habits,
   logs,
+  currentDateKey,
   onPromoteAndAddHabit,
   embedded = false,
   onClose,
@@ -39,12 +41,17 @@ export const MonthlyReviewContent: React.FC<MonthlyReviewContentProps> = ({
   const { t, locale } = useTranslation();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
 
-  const now = new Date();
-  const monthName = now.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  const now = currentDateKey ? parseLocalDateStr(currentDateKey) : new Date();
+  // El día 1 del mes, el ritual de cierre muestra el balance del mes que acaba de terminar
+  const reviewDate =
+    now.getDate() === 1
+      ? new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthName = reviewDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
-  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthLogs = Object.values(logs).filter((l) => l.date.startsWith(currentMonthPrefix));
+  const targetMonthPrefix = `${reviewDate.getFullYear()}-${String(reviewDate.getMonth() + 1).padStart(2, '0')}`;
+  const monthLogs = Object.values(logs).filter((l) => l.date.startsWith(targetMonthPrefix));
 
   const daysCompletedSet = new Set<string>();
   const daysShieldedSet = new Set<string>();
@@ -161,6 +168,11 @@ export const MonthlyReviewContent: React.FC<MonthlyReviewContentProps> = ({
             <Text style={styles.activeTag}>{t.monthly.allConsolidatedTag}</Text>
             <Text style={styles.activeName}>{t.monthly.allConsolidatedTitle}</Text>
             <Text style={styles.pedagogyText}>{t.monthly.allConsolidatedSub}</Text>
+            <TouchableOpacity style={styles.pedagogyBtn} onPress={handleContinue}>
+              <Text style={styles.pedagogyBtnText}>
+                {embedded ? t.detail.backToToday : t.dashboard.understood}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -173,6 +185,7 @@ export const MonthlyReviewModal: React.FC<MonthlyReviewModalProps> = ({
   onClose,
   habits,
   logs,
+  currentDateKey,
   onPromoteAndAddHabit,
 }) => {
   const { colors, shadows } = useAppTheme();
@@ -185,6 +198,7 @@ export const MonthlyReviewModal: React.FC<MonthlyReviewModalProps> = ({
           <MonthlyReviewContent
             habits={habits}
             logs={logs}
+            currentDateKey={currentDateKey}
             onPromoteAndAddHabit={onPromoteAndAddHabit}
             onClose={onClose}
           />

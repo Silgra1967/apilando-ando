@@ -27,15 +27,16 @@ import {
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
-import { useHabitStore } from '../store/habitStore';
+import { useHabitStore, toLocalDateStr } from '../store/habitStore';
 import { Habit, isEligibleForAnchorGraduation } from '../types/habit';
 import { triggerSuccessHaptic, triggerLightHaptic } from '../services/hapticService';
 import { MilestoneCelebrationData } from '../components/MilestoneCelebrationModal';
 import { ConfettiBurst } from '../components/ConfettiBurst';
 
 interface DashboardScreenProps {
+  currentDateKey?: string;
   onOpenDetail: (habit: Habit) => void;
-  onSimulateShield: () => void;
+  onOpenShieldStatus: () => void;
   onOpenAddHabit: () => void;
   onPromoteHabit: (habit: Habit) => void;
   onOpenSettings: () => void;
@@ -45,8 +46,9 @@ interface DashboardScreenProps {
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
+  currentDateKey,
   onOpenDetail,
-  onSimulateShield,
+  onOpenShieldStatus,
   onOpenAddHabit,
   onPromoteHabit,
   onOpenSettings,
@@ -80,11 +82,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         }
       : null;
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const todayStr = `${year}-${month}-${day}`;
+  const todayStr = currentDateKey || toLocalDateStr(new Date());
+  const [yNum, mNum, dNum] = todayStr.split('-').map(Number);
+  const now = new Date(yNum, (mNum || 1) - 1, dNum || 1);
 
   const formattedDate = now.toLocaleDateString(locale, {
     weekday: 'long',
@@ -109,10 +109,29 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     return logs[`${habitId}_${todayStr}`]?.status === 'completed';
   };
 
+  const handleToggleHabit = async (habitId: string, alreadyDone: boolean, strongHaptic: boolean) => {
+    if (!alreadyDone) {
+      setConfettiKey((k) => k + 1);
+      if (strongHaptic) {
+        triggerSuccessHaptic();
+      } else {
+        triggerLightHaptic();
+      }
+    } else {
+      triggerLightHaptic();
+    }
+    const celebration = await toggleDayCompletion(habitId, todayStr);
+    if (celebration && onMilestoneReached) {
+      onMilestoneReached(celebration);
+    }
+  };
+
   const totalCheckable = (activeHabit ? 1 : 0) + maintenanceHabits.length;
   const totalDone =
     (activeHabit && isCompletedToday(activeHabit.id) ? 1 : 0) +
     maintenanceHabits.filter((m) => isCompletedToday(m.id)).length;
+  const stackItemCount =
+    (activeHabit?.anchorText ? 1 : 0) + anchorHabits.length + maintenanceHabits.length + 1;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -136,10 +155,21 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </View>
 
               <View style={styles.topActions}>
-                <TouchableOpacity style={styles.iconCircleBtn} onPress={onSimulateShield}>
-                  <Shield size={17} color={colors.muted} />
+                <TouchableOpacity
+                  style={styles.iconCircleBtn}
+                  onPress={onOpenShieldStatus}
+                  accessibilityLabel={t.modals.shieldInfoBadge}
+                >
+                  <Shield
+                    size={17}
+                    color={pendingShieldCount > 0 ? colors.coral : colors.muted}
+                  />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconCircleBtn} onPress={onOpenSettings}>
+                <TouchableOpacity
+                  style={styles.iconCircleBtn}
+                  onPress={onOpenSettings}
+                  accessibilityLabel={t.settings.title}
+                >
                   <Settings size={17} color={colors.muted} />
                 </TouchableOpacity>
               </View>
@@ -192,11 +222,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </View>
               <View style={styles.pendingShieldTextCol}>
                 <Text style={styles.longPausedTitle}>
-                  "{longPausedHabit.name}" lleva {longPausedDays} días en pausa
+                  {formatText(t.dashboard.longPausedTitle, {
+                    name: longPausedHabit.name,
+                    days: longPausedDays,
+                  })}
                 </Text>
-                <Text style={styles.pendingShieldSub}>
-                  Cuando sientas que es momento, podés reanudarlo o archivarlo con paz.
-                </Text>
+                <Text style={styles.pendingShieldSub}>{t.dashboard.longPausedSub}</Text>
               </View>
               <ChevronRight size={16} color={colors.aquaDark} />
             </TouchableOpacity>
@@ -204,7 +235,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
           {/* CONTENEDOR HABIT STACKING CON RIEL VERTICAL */}
           <View style={styles.stackContainer}>
-            <View style={styles.verticalRail} />
+            {stackItemCount > 1 && <View style={styles.verticalRail} />}
 
             {/* 1. ANCLA INICIAL */}
             {activeHabit?.anchorText && (
@@ -221,7 +252,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       style={styles.anchorHelpBtn}
                       onPress={() => setHelpTopic('anchor')}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityLabel="Qué es un hábito ancla"
+                      accessibilityLabel={t.dashboard.anchorHelpAccessibility}
                     >
                       <HelpCircle size={18} color={colors.muted} />
                     </TouchableOpacity>
@@ -248,7 +279,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     </View>
                     <Text style={styles.integratedText}>{t.dashboard.integrated}</Text>
                   </View>
-                  <Text style={styles.habitTitle}>{a.name}</Text>
+                  <View style={styles.habitTitleRow}>
+                    <View
+                      style={[
+                        styles.habitColorDot,
+                        { backgroundColor: a.color || colors.aquaDark },
+                      ]}
+                    />
+                    <Text style={styles.habitTitle}>{a.name}</Text>
+                  </View>
                   <View style={styles.metaInline}>
                     <Sparkles size={13} color={colors.aquaDark} />
                     <Text style={styles.graduatedStreak}>
@@ -284,9 +323,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                           </View>
                         )}
                       </View>
-                      <Text style={styles.habitTitle} numberOfLines={2}>
-                        {m.name}
-                      </Text>
+                      <View style={styles.habitTitleRow}>
+                        <View
+                          style={[
+                            styles.habitColorDot,
+                            { backgroundColor: m.color || colors.aqua },
+                          ]}
+                        />
+                        <Text style={styles.habitTitle} numberOfLines={2}>
+                          {m.name}
+                        </Text>
+                      </View>
                       <View style={styles.metaInline}>
                         <Flame size={13} color={colors.coral} />
                         <Text style={styles.streakFlame}>
@@ -297,15 +344,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
                     <TouchableOpacity
                       style={[styles.checkboxCircle, done && styles.checkboxCircleDone]}
-                      onPress={() => {
-                        if (!done) {
-                          setConfettiKey((k) => k + 1);
-                        }
-                        triggerLightHaptic();
-                        toggleDayCompletion(m.id, todayStr);
-                      }}
+                      onPress={() => handleToggleHabit(m.id, done, false)}
                     >
-                      {done && <Check size={19} color={colors.white} strokeWidth={2.8} />}
+                      {done && <Check size={19} color={colors.onCoral} strokeWidth={2.8} />}
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -336,7 +377,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
                   <TouchableOpacity activeOpacity={0.8} onPress={() => onOpenDetail(activeHabit)}>
                     <View style={styles.titleRow}>
-                      <Text style={styles.activeHabitTitle}>{activeHabit.name}</Text>
+                      <View style={styles.activeTitleWrap}>
+                        <View
+                          style={[
+                            styles.habitColorDot,
+                            { backgroundColor: activeHabit.color || colors.coral },
+                          ]}
+                        />
+                        <Text style={styles.activeHabitTitle}>{activeHabit.name}</Text>
+                      </View>
                       <View style={styles.seeDetailPill}>
                         <Text style={styles.seeDetailText}>{t.dashboard.seeDetail}</Text>
                         <ChevronRight size={14} color={colors.aquaDark} />
@@ -395,18 +444,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       isCompletedToday(activeHabit.id) && styles.bigCheckButtonDone,
                     ]}
                     activeOpacity={0.9}
-                    onPress={async () => {
-                      if (!isCompletedToday(activeHabit.id)) {
-                        setConfettiKey((k) => k + 1);
-                        triggerSuccessHaptic();
-                      } else {
-                        triggerLightHaptic();
-                      }
-                      const celebration = await toggleDayCompletion(activeHabit.id, todayStr);
-                      if (celebration && onMilestoneReached) {
-                        onMilestoneReached(celebration);
-                      }
-                    }}
+                    onPress={() =>
+                      handleToggleHabit(activeHabit.id, isCompletedToday(activeHabit.id), true)
+                    }
                   >
                     {isCompletedToday(activeHabit.id) && (
                       <Check
@@ -926,6 +966,23 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
     fontFamily: THEME.fonts.medium,
     fontSize: 15,
     color: colors.dark,
+    flexShrink: 1,
+  },
+  habitTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  activeTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  habitColorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   streakFlame: {
     fontFamily: THEME.fonts.medium,

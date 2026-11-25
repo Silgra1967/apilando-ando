@@ -1,5 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet, StatusBar, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  StatusBar,
+  Platform,
+  AppState,
+} from 'react-native';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { Sprout, Trophy, Calendar } from 'lucide-react-native';
 import {
@@ -9,7 +19,11 @@ import {
   PlusJakartaSans_600SemiBold,
   PlusJakartaSans_700Bold,
 } from '@expo-google-fonts/plus-jakarta-sans';
-import { useHabitStore, areTodayCheckableHabitsCompleted } from './src/store/habitStore';
+import {
+  useHabitStore,
+  areTodayCheckableHabitsCompleted,
+  toLocalDateStr,
+} from './src/store/habitStore';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { DetailScreen } from './src/screens/DetailScreen';
@@ -34,12 +48,21 @@ import {
   cancelShieldAlerts,
 } from './src/services/notificationService';
 
+function getMonthlyReviewKey(now: Date): string {
+  const target =
+    now.getDate() === 1
+      ? new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      : now;
+  return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function AppContent() {
   const {
     isLoaded,
     loadFromStorage,
     settings,
     habits,
+    logs,
     resolveShieldDecisions,
     promoteToMaintenance,
     addNewActiveHabit,
@@ -48,19 +71,19 @@ function AppContent() {
   } = useHabitStore();
   const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'detail'>('dashboard');
   const [activeTab, setActiveTab] = useState<'today' | 'album' | 'month'>('today');
-  const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
+  const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
   const [shieldModalVisible, setShieldModalVisible] = useState<boolean>(false);
   const [addHabitModalVisible, setAddHabitModalVisible] = useState<boolean>(false);
   const [consolidationModalVisible, setConsolidationModalVisible] = useState<boolean>(false);
   const [habitToConsolidate, setHabitToConsolidate] = useState<Habit | null>(null);
   const [stickersModalVisible, setStickersModalVisible] = useState<boolean>(false);
-  const [habitForStickers, setHabitForStickers] = useState<Habit | null>(null);
+  const [habitForStickersId, setHabitForStickersId] = useState<string | null>(null);
   const [settingsModalVisible, setSettingsModalVisible] = useState<boolean>(false);
   const [monthlyReviewVisible, setMonthlyReviewVisible] = useState<boolean>(false);
   const [milestoneCelebration, setMilestoneCelebration] = useState<MilestoneCelebrationData | null>(null);
   const [pendingShieldDate, setPendingShieldDate] = useState<string | null>(null);
   const [pendingShieldHabits, setPendingShieldHabits] = useState<Habit[]>([]);
-  const [simulatingShield, setSimulatingShield] = useState<boolean>(false);
+  const [currentDateKey, setCurrentDateKey] = useState<string>(() => toLocalDateStr(new Date()));
   const { colors, isDark } = useAppTheme();
   const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -69,13 +92,62 @@ function AppContent() {
     loadFromStorage();
   }, []);
 
-  // Programar recordatorio diario y verificar escudos pendientes al abrir
+  // Detectar cambio de día al volver de segundo plano (móvil/web) o al cruzar medianoche
+  useEffect(() => {
+    const syncCurrentDate = () => {
+      const latestDate = toLocalDateStr(new Date());
+      setCurrentDateKey((prev) => (prev !== latestDate ? latestDate : prev));
+    };
+
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        syncCurrentDate();
+      }
+    });
+
+    const handleWebVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        syncCurrentDate();
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof document !== 'undefined' && typeof window !== 'undefined') {
+      document.addEventListener('visibilitychange', handleWebVisibility);
+      window.addEventListener('focus', syncCurrentDate);
+    }
+
+    // Programar actualización exacta 2 segundos después de medianoche
+    const now = new Date();
+    const nextMidnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+      0,
+      0,
+      2,
+      0
+    );
+    const msUntilMidnight = Math.max(1000, nextMidnight.getTime() - now.getTime());
+    const midnightTimer = setTimeout(syncCurrentDate, msUntilMidnight);
+
+    return () => {
+      appStateSub.remove();
+      clearTimeout(midnightTimer);
+      if (Platform.OS === 'web' && typeof document !== 'undefined' && typeof window !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleWebVisibility);
+        window.removeEventListener('focus', syncCurrentDate);
+      }
+    };
+  }, [currentDateKey]);
+
+  // Programar recordatorio diario y verificar escudos pendientes al abrir o al cambiar de día
   useEffect(() => {
     if (isLoaded && settings.onboardingCompleted) {
+      const activeLang = settings.language || 'es';
       if (settings.notificationsEnabled) {
         const { habits: currentHabits, logs: currentLogs } = useHabitStore.getState();
         const allTodayDone = areTodayCheckableHabitsCompleted(currentHabits, currentLogs);
-        scheduleDailyReminder(settings.reminderTime || '20:00', allTodayDone);
+        scheduleDailyReminder(settings.reminderTime || '20:00', allTodayDone, activeLang);
       } else {
         cancelDailyReminders();
       }
@@ -85,10 +157,12 @@ function AppContent() {
         if (pending && pending.pendingHabits.length > 0) {
           setPendingShieldHabits(pending.pendingHabits);
           setPendingShieldDate(pending.missedDate);
-          setSimulatingShield(false);
           setShieldModalVisible(true);
           if (settings.notificationsEnabled) {
-            scheduleShieldAlert(pending.pendingHabits.map((h) => h.name));
+            scheduleShieldAlert(
+              pending.pendingHabits.map((h) => h.name),
+              activeLang
+            );
           }
         } else {
           setPendingShieldHabits([]);
@@ -99,14 +173,40 @@ function AppContent() {
           const now = new Date();
           const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
           const isReviewWindow = now.getDate() === 1 || now.getDate() >= daysInMonth - 1;
-          const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-          if (isReviewWindow && settings.lastMonthlyReviewDismissed !== currentMonthKey) {
+          const reviewKey = getMonthlyReviewKey(now);
+          if (isReviewWindow && settings.lastMonthlyReviewDismissed !== reviewKey) {
             setMonthlyReviewVisible(true);
           }
         }
       });
     }
-  }, [isLoaded, settings.onboardingCompleted, settings.reminderTime, settings.notificationsEnabled]);
+  }, [
+    isLoaded,
+    settings.onboardingCompleted,
+    settings.reminderTime,
+    settings.notificationsEnabled,
+    settings.language,
+    currentDateKey,
+  ]);
+
+  const checkableHabits = useMemo(
+    () =>
+      habits
+        .filter((h) => h.status === 'active' || h.status === 'maintenance')
+        .sort((a, b) => (a.status === 'active' ? -1 : b.status === 'active' ? 1 : 0)),
+    [habits]
+  );
+
+  const livePendingShieldHabits = useMemo(() => {
+    if (!pendingShieldDate) return [];
+    return pendingShieldHabits.filter((pending) => {
+      const current = habits.find((h) => h.id === pending.id);
+      if (!current) return false;
+      if (current.status !== 'active' && current.status !== 'maintenance') return false;
+      if (current.shieldsAvailable <= 0) return false;
+      return !logs[`${current.id}_${pendingShieldDate}`];
+    });
+  }, [pendingShieldHabits, pendingShieldDate, habits, logs]);
 
   if (!isLoaded) {
     return <BrandSplash colors={colors} />;
@@ -122,50 +222,49 @@ function AppContent() {
     );
   }
 
-  const activeHabit = habits.find((h) => h.status === 'active') || habits[0];
-  const yesterdayLocal = new Date(Date.now() - 86400000);
-  const yesterdayStr = `${yesterdayLocal.getFullYear()}-${String(yesterdayLocal.getMonth() + 1).padStart(2, '0')}-${String(yesterdayLocal.getDate()).padStart(2, '0')}`;
-  const checkableWithShields = habits.filter(
-    (h) => (h.status === 'active' || h.status === 'maintenance') && h.shieldsAvailable > 0
-  );
-  const modalShieldHabits =
-    !simulatingShield && pendingShieldHabits.length > 0
-      ? pendingShieldHabits
-      : checkableWithShields.length > 0
-      ? checkableWithShields
-      : activeHabit
-      ? [activeHabit]
-      : [];
+  const isShieldInfoOnly = livePendingShieldHabits.length === 0;
+  const modalShieldHabits = isShieldInfoOnly ? checkableHabits : livePendingShieldHabits;
+  const hasActiveHabit = habits.some((h) => h.status === 'active');
+  const selectedHabit = selectedHabitId
+    ? habits.find((h) => h.id === selectedHabitId) || null
+    : null;
+  const habitForStickers = habitForStickersId
+    ? habits.find((h) => h.id === habitForStickersId) || null
+    : null;
+
+  const openAddHabitIfAllowed = () => {
+    const currentHasActive = useHabitStore
+      .getState()
+      .habits.some((h) => h.status === 'active');
+    if (!currentHasActive) {
+      setAddHabitModalVisible(true);
+    }
+  };
 
   return (
     <>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {currentScreen === 'dashboard' ? (
+      {currentScreen === 'dashboard' || !selectedHabit ? (
         <View style={styles.mainShell}>
           <View style={styles.tabBody}>
             {activeTab === 'today' && (
               <DashboardScreen
+                currentDateKey={currentDateKey}
                 onOpenDetail={(habit) => {
-                  setSelectedHabit(habit);
+                  setSelectedHabitId(habit.id);
                   setCurrentScreen('detail');
                 }}
-                onSimulateShield={() => {
-                  setSimulatingShield(pendingShieldHabits.length === 0);
-                  setShieldModalVisible(true);
-                }}
-                onOpenAddHabit={() => setAddHabitModalVisible(true)}
+                onOpenShieldStatus={() => setShieldModalVisible(true)}
+                onOpenAddHabit={openAddHabitIfAllowed}
                 onPromoteHabit={(habit) => {
                   setHabitToConsolidate(habit);
                   setConsolidationModalVisible(true);
                 }}
                 onOpenSettings={() => setSettingsModalVisible(true)}
                 onMilestoneReached={(celebration) => setMilestoneCelebration(celebration)}
-                pendingShieldCount={pendingShieldHabits.length}
-                onOpenPendingShields={() => {
-                  setSimulatingShield(false);
-                  setShieldModalVisible(true);
-                }}
+                pendingShieldCount={livePendingShieldHabits.length}
+                onOpenPendingShields={() => setShieldModalVisible(true)}
               />
             )}
 
@@ -180,10 +279,11 @@ function AppContent() {
                 <MonthlyReviewContent
                   embedded
                   habits={habits}
-                  logs={useHabitStore.getState().logs}
+                  logs={logs}
+                  currentDateKey={currentDateKey}
                   onPromoteAndAddHabit={async (habit) => {
                     await promoteToMaintenance(habit.id);
-                    setAddHabitModalVisible(true);
+                    openAddHabitIfAllowed();
                   }}
                   onContinueFocus={() => setActiveTab('today')}
                 />
@@ -244,20 +344,19 @@ function AppContent() {
           </SafeAreaView>
         </View>
       ) : (
-        selectedHabit && (
-          <DetailScreen
-            habit={habits.find((h) => h.id === selectedHabit.id) || selectedHabit}
-            onBack={() => {
-              setSelectedHabit(null);
-              setCurrentScreen('dashboard');
-            }}
-            onOpenAddHabit={() => setAddHabitModalVisible(true)}
-            onOpenStickers={() => {
-              setHabitForStickers(selectedHabit);
-              setStickersModalVisible(true);
-            }}
-          />
-        )
+        <DetailScreen
+          habit={selectedHabit}
+          currentDateKey={currentDateKey}
+          onBack={() => {
+            setSelectedHabitId(null);
+            setCurrentScreen('dashboard');
+          }}
+          onOpenAddHabit={openAddHabitIfAllowed}
+          onOpenStickers={() => {
+            setHabitForStickersId(selectedHabit.id);
+            setStickersModalVisible(true);
+          }}
+        />
       )}
 
       {/* Modal de Consolidación por 21 Días */}
@@ -269,7 +368,7 @@ function AppContent() {
             await promoteToMaintenance(habitToConsolidate.id);
           }
           setConsolidationModalVisible(false);
-          setAddHabitModalVisible(true);
+          openAddHabitIfAllowed();
         }}
         onKeepActive={() => setConsolidationModalVisible(false)}
       />
@@ -279,8 +378,9 @@ function AppContent() {
         visible={addHabitModalVisible}
         onClose={() => setAddHabitModalVisible(false)}
         availableAnchors={habits.filter((h) => h.status === 'maintenance' || h.status === 'anchor')}
+        hasActiveHabit={hasActiveHabit}
         onAddHabit={async (name, color, anchorText) => {
-          await addNewActiveHabit(name, color, anchorText);
+          return await addNewActiveHabit(name, color, anchorText);
         }}
       />
 
@@ -297,12 +397,13 @@ function AppContent() {
         visible={settingsModalVisible}
         onClose={() => setSettingsModalVisible(false)}
         onResetOnboarding={() => {
-          setSelectedHabit(null);
+          setSelectedHabitId(null);
+          setHabitForStickersId(null);
           setActiveTab('today');
           setCurrentScreen('dashboard');
         }}
         onOpenHabitDetail={(habit) => {
-          setSelectedHabit(habit);
+          setSelectedHabitId(habit.id);
           setCurrentScreen('detail');
         }}
       />
@@ -311,53 +412,49 @@ function AppContent() {
       <MonthlyReviewModal
         visible={monthlyReviewVisible}
         onClose={() => {
-          const now = new Date();
-          const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-          updateSettings({ lastMonthlyReviewDismissed: currentMonthKey });
+          const reviewKey = getMonthlyReviewKey(new Date());
+          updateSettings({ lastMonthlyReviewDismissed: reviewKey });
           setMonthlyReviewVisible(false);
         }}
         habits={habits}
-        logs={useHabitStore.getState().logs}
+        logs={logs}
+        currentDateKey={currentDateKey}
         onPromoteAndAddHabit={async (habit) => {
           await promoteToMaintenance(habit.id);
-          setAddHabitModalVisible(true);
+          openAddHabitIfAllowed();
         }}
       />
 
-      {/* Modal interactivo de confirmación de escudo (individual o agrupado) */}
+      {/* Modal interactivo de confirmación de escudo (o estado informativo si no hay pendientes) */}
       <ShieldModal
         visible={shieldModalVisible}
         habits={modalShieldHabits}
+        infoOnly={isShieldInfoOnly}
         onConfirmSingle={async (habit) => {
-          await resolveShieldDecisions(pendingShieldDate || yesterdayStr, [habit.id], []);
+          if (!pendingShieldDate) return;
+          await resolveShieldDecisions(pendingShieldDate, [habit.id], []);
           setPendingShieldHabits([]);
           setPendingShieldDate(null);
-          setSimulatingShield(false);
           setShieldModalVisible(false);
           cancelShieldAlerts();
         }}
         onRejectSingle={async (habit) => {
-          await resolveShieldDecisions(pendingShieldDate || yesterdayStr, [], [habit.id]);
+          if (!pendingShieldDate) return;
+          await resolveShieldDecisions(pendingShieldDate, [], [habit.id]);
           setPendingShieldHabits([]);
           setPendingShieldDate(null);
-          setSimulatingShield(false);
           setShieldModalVisible(false);
           cancelShieldAlerts();
         }}
         onConfirmGrouped={async (protectedIds, resetIds) => {
-          await resolveShieldDecisions(
-            pendingShieldDate || yesterdayStr,
-            protectedIds,
-            resetIds
-          );
+          if (!pendingShieldDate) return;
+          await resolveShieldDecisions(pendingShieldDate, protectedIds, resetIds);
           setPendingShieldHabits([]);
           setPendingShieldDate(null);
-          setSimulatingShield(false);
           setShieldModalVisible(false);
           cancelShieldAlerts();
         }}
         onClose={() => {
-          setSimulatingShield(false);
           setShieldModalVisible(false);
         }}
       />

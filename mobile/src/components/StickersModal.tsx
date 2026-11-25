@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,13 +13,18 @@ import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
 import { Habit } from '../types/habit';
-import { MILESTONE_STICKERS, MilestoneSticker } from '../types/stickers';
+import {
+  MILESTONE_STICKERS,
+  MilestoneSticker,
+  findMilestoneSticker,
+} from '../types/stickers';
 
 interface StickersContentProps {
   habit?: Habit | null;
   allHabits: Habit[];
   embedded?: boolean;
   onClose?: () => void;
+  resetTrigger?: boolean;
 }
 
 interface StickersModalProps extends StickersContentProps {
@@ -32,12 +37,18 @@ export const StickersContent: React.FC<StickersContentProps> = ({
   allHabits,
   embedded = false,
   onClose,
+  resetTrigger,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'streak' | 'special'>('all');
   const [activeStickerDetail, setActiveStickerDetail] = useState<MilestoneSticker | null>(null);
   const { colors, shadows } = useAppTheme();
   const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
+
+  useEffect(() => {
+    setSelectedCategory('all');
+    setActiveStickerDetail(null);
+  }, [habit?.id, resetTrigger]);
 
   const unlockedNames = new Set<string>();
   if (habit) {
@@ -50,14 +61,7 @@ export const StickersContent: React.FC<StickersContentProps> = ({
 
   const isUnlocked = (st: MilestoneSticker) => {
     return Array.from(unlockedNames).some(
-      (unlocked) =>
-        unlocked.includes(st.name) ||
-        unlocked.includes(st.emoji) ||
-        (st.id === 'first_step' && unlocked.includes('Primer Paso')) ||
-        (st.id === 'streak_7' && unlocked.includes('7 Días')) ||
-        (st.id === 'streak_14' && unlocked.includes('14 Días')) ||
-        (st.id === 'streak_21' && (unlocked.includes('21 Días') || unlocked.includes('Consolidado'))) ||
-        (st.id === 'anchor_graduated' && unlocked.includes('Ancla'))
+      (unlocked) => findMilestoneSticker(unlocked)?.id === st.id
     );
   };
 
@@ -142,6 +146,41 @@ export const StickersContent: React.FC<StickersContentProps> = ({
 
       {/* REJILLA DE STICKERS */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.gridContent}>
+        {/* DETALLE DEL STICKER SELECCIONADO (ARRIBA PARA VISIBILIDAD INMEDIATA) */}
+        {activeStickerDetail && (
+          <View style={styles.detailCard}>
+            <View style={styles.detailHeader}>
+              {isUnlocked(activeStickerDetail) ? (
+                <Image
+                  source={activeStickerDetail.image}
+                  style={styles.detailImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.detailEmoji}>🔒</Text>
+              )}
+              <View style={styles.detailTitleCol}>
+                <Text style={styles.detailTitle}>{getStickerCopy(activeStickerDetail).name}</Text>
+                <Text style={styles.detailStatus}>
+                  {isUnlocked(activeStickerDetail)
+                    ? t.stickers.unlockedStatus
+                    : formatText(t.stickers.lockedStatus, {
+                        desc: getStickerCopy(activeStickerDetail).description,
+                      })}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setActiveStickerDetail(null)}
+                style={styles.detailCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.detailCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.detailLore}>"{getStickerCopy(activeStickerDetail).lore}"</Text>
+          </View>
+        )}
+
         <View style={styles.stickersGrid}>
           {filteredStickers.map((st) => {
             const unlocked = isUnlocked(st);
@@ -180,34 +219,6 @@ export const StickersContent: React.FC<StickersContentProps> = ({
             );
           })}
         </View>
-
-        {/* DETALLE DEL STICKER SELECCIONADO */}
-        {activeStickerDetail && (
-          <View style={styles.detailCard}>
-            <View style={styles.detailHeader}>
-              {isUnlocked(activeStickerDetail) ? (
-                <Image
-                  source={activeStickerDetail.image}
-                  style={styles.detailImage}
-                  resizeMode="contain"
-                />
-              ) : (
-                <Text style={styles.detailEmoji}>🔒</Text>
-              )}
-              <View style={styles.detailTitleCol}>
-                <Text style={styles.detailTitle}>{getStickerCopy(activeStickerDetail).name}</Text>
-                <Text style={styles.detailStatus}>
-                  {isUnlocked(activeStickerDetail)
-                    ? t.stickers.unlockedStatus
-                    : formatText(t.stickers.lockedStatus, {
-                        desc: getStickerCopy(activeStickerDetail).description,
-                      })}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.detailLore}>"{getStickerCopy(activeStickerDetail).lore}"</Text>
-          </View>
-        )}
       </ScrollView>
     </View>
   );
@@ -226,7 +237,12 @@ export const StickersModal: React.FC<StickersModalProps> = ({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.sheetContainer}>
-          <StickersContent habit={habit} allHabits={allHabits} onClose={onClose} />
+          <StickersContent
+            habit={habit}
+            allHabits={allHabits}
+            onClose={onClose}
+            resetTrigger={visible}
+          />
         </View>
       </View>
     </Modal>
@@ -388,13 +404,21 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
       marginTop: 2,
     },
     detailCard: {
-      marginTop: 20,
+      marginBottom: 16,
       backgroundColor: colors.white,
       borderRadius: THEME.radius.lg,
       padding: 16,
       borderWidth: 1,
       borderColor: colors.border,
       ...shadows.card,
+    },
+    detailCloseBtn: {
+      padding: 4,
+    },
+    detailCloseText: {
+      fontFamily: THEME.fonts.medium,
+      fontSize: 13,
+      color: colors.muted,
     },
     detailHeader: {
       flexDirection: 'row',

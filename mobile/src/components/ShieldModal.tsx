@@ -16,6 +16,7 @@ import { Habit } from '../types/habit';
 interface ShieldModalProps {
   visible: boolean;
   habits: Habit[];
+  infoOnly?: boolean;
   onConfirmSingle: (habit: Habit) => void;
   onRejectSingle: (habit: Habit) => void;
   onConfirmGrouped: (protectedIds: string[], resetIds: string[]) => void;
@@ -25,6 +26,7 @@ interface ShieldModalProps {
 export const ShieldModal: React.FC<ShieldModalProps> = ({
   visible,
   habits,
+  infoOnly = false,
   onConfirmSingle,
   onRejectSingle,
   onConfirmGrouped,
@@ -36,17 +38,17 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
-    if (visible) {
+    if (visible && !infoOnly) {
       setSelectedIds(habits.map((h) => h.id));
     }
-  }, [visible, habits]);
+  }, [visible, habits, infoOnly]);
 
-  if (!habits || habits.length === 0) return null;
+  if (!infoOnly && (!habits || habits.length === 0)) return null;
 
-  const isGrouped = habits.length > 1;
+  const isGrouped = !infoOnly && habits.length > 1;
   const singleHabit = habits[0];
-  const remainingAfterUse = Math.max(0, singleHabit.shieldsAvailable - 1);
-  const daysTo21 = Math.max(0, 21 - singleHabit.currentStreak);
+  const remainingAfterUse = singleHabit ? Math.max(0, singleHabit.shieldsAvailable - 1) : 0;
+  const daysTo21 = singleHabit ? Math.max(0, 21 - singleHabit.currentStreak) : 0;
 
   const toggleHabit = (id: string) => {
     setSelectedIds((prev) =>
@@ -78,7 +80,55 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
             </View>
           </View>
 
-          {!isGrouped ? (
+          {infoOnly ? (
+            <>
+              <View style={styles.centerHeader}>
+                <View style={styles.empathyPill}>
+                  <Text style={styles.empathyPillText}>{t.modals.shieldInfoBadge}</Text>
+                </View>
+                <Text style={styles.title}>{t.modals.shieldInfoTitle}</Text>
+                <Text style={styles.subtitle}>{t.modals.shieldInfoSubtitle}</Text>
+              </View>
+
+              {habits.length > 0 ? (
+                <ScrollView
+                  style={styles.groupedScroll}
+                  contentContainerStyle={styles.groupedList}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {habits.map((h) => (
+                    <View key={h.id} style={styles.groupedRow}>
+                      <View style={styles.groupedInfo}>
+                        <Text style={styles.groupedName} numberOfLines={1}>
+                          {h.name}
+                        </Text>
+                        <Text style={styles.groupedMeta}>
+                          {formatText(t.modals.shieldInfoRowMeta, {
+                            shields: h.shieldsAvailable,
+                            streak: h.currentStreak,
+                          })}
+                        </Text>
+                      </View>
+                      <Text style={styles.shieldEmojis}>
+                        {'🛡️'.repeat(Math.max(0, h.shieldsAvailable))}
+                        {'⚪'.repeat(Math.max(0, 3 - h.shieldsAvailable))}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.statusBox}>
+                  <Text style={styles.statusSub}>{t.modals.shieldInfoEmpty}</Text>
+                </View>
+              )}
+
+              <View style={styles.buttonStack}>
+                <TouchableOpacity style={styles.primaryButton} onPress={onClose}>
+                  <Text style={styles.primaryButtonText}>{t.dashboard.understood}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : !isGrouped ? (
             <>
               <View style={styles.centerHeader}>
                 <View style={styles.empathyPill}>
@@ -94,7 +144,7 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
 
               <View style={styles.statusBox}>
                 <View style={styles.statusTopRow}>
-                  <Text style={styles.statusLabel}>Tus escudos de gracia</Text>
+                  <Text style={styles.statusLabel}>{t.modals.shieldStatusLabel}</Text>
                   <View style={styles.shieldsCompareRow}>
                     <Text style={styles.shieldEmojis}>
                       {'🛡️'.repeat(Math.max(0, singleHabit.shieldsAvailable))}
@@ -107,8 +157,11 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
                   </View>
                 </View>
                 <Text style={styles.statusSub}>
-                  Te quedarían <Text style={styles.boldText}>{remainingAfterUse} de 3</Text>{' '}
-                  disponibles. Podés recuperar otro al alcanzar un nuevo hito.
+                  {t.modals.shieldRemainingPrefix}{' '}
+                  <Text style={styles.boldText}>
+                    {formatText(t.modals.shieldRemainingCount, { count: remainingAfterUse })}
+                  </Text>{' '}
+                  {t.modals.shieldRemainingSuffix}
                 </Text>
               </View>
 
@@ -138,10 +191,13 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
                     <Award size={20} color={colors.aquaDark} />
                   </View>
                   <View style={styles.milestoneTextCol}>
-                    <Text style={styles.milestoneTag}>HITO DE 21 DÍAS 🌿</Text>
+                    <Text style={styles.milestoneTag}>{t.modals.shieldMilestoneTag}</Text>
                     <Text style={styles.milestoneCopy}>
-                      Estás a solo <Text style={styles.boldText}>{daysTo21} días</Text> de pasar este
-                      hábito a Mantenimiento y habilitar uno nuevo.
+                      {t.modals.shieldMilestonePrefix}{' '}
+                      <Text style={styles.boldText}>
+                        {formatText(t.modals.shieldMilestoneDays, { count: daysTo21 })}
+                      </Text>{' '}
+                      {t.modals.shieldMilestoneSuffix}
                     </Text>
                   </View>
                 </View>
@@ -177,7 +233,7 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
                     >
                       <View style={[styles.groupedCheck, checked && styles.groupedCheckActive]}>
                         {checked && (
-                          <Check size={15} color={colors.white} strokeWidth={2.8} />
+                          <Check size={15} color={colors.onCoral} strokeWidth={2.8} />
                         )}
                       </View>
                       <View style={styles.groupedInfo}>
@@ -185,8 +241,14 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
                           {h.name}
                         </Text>
                         <Text style={styles.groupedMeta}>
-                          {h.status === 'active' ? '🌱 En construcción' : '🌿 Mantenimiento'} ·{' '}
-                          {h.currentStreak}d racha · {h.shieldsAvailable}/3 🛡️
+                          {formatText(t.modals.shieldGroupedMeta, {
+                            status:
+                              h.status === 'active'
+                                ? t.modals.shieldGroupedStatusActive
+                                : t.modals.shieldGroupedStatusMaint,
+                            streak: h.currentStreak,
+                            shields: h.shieldsAvailable,
+                          })}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -403,7 +465,7 @@ const createStyles = (colors: ThemeColors) =>
   },
   primaryButtonText: {
     fontFamily: THEME.fonts.semibold,
-    color: colors.white,
+    color: colors.onCoral,
     fontSize: 15,
   },
   secondaryButton: {

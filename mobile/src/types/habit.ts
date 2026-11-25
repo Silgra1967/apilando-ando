@@ -21,9 +21,11 @@ export interface Habit {
   promotedToMaintenanceAt?: string;
   graduatedToAnchorAt?: string;
   pausedAt?: string;
+  resumedAt?: string;
   archivedAt?: string;
   
   stickersUnlocked: string[];
+  rewardedMilestones?: number[];
 }
 
 export type DayStatus = 'completed' | 'shielded' | 'missed' | 'paused';
@@ -59,8 +61,18 @@ export function isEligibleForAnchorGraduation(
 ): boolean {
   if (habit.status !== 'maintenance' || !habit.promotedToMaintenanceAt) return false;
   const promotedDate = new Date(habit.promotedToMaintenanceAt);
-  const diffInMonths =
-    (currentDate.getFullYear() - promotedDate.getFullYear()) * 12 +
-    (currentDate.getMonth() - promotedDate.getMonth());
-  return diffInMonths >= 6;
+  const thresholdDate = new Date(promotedDate);
+  thresholdDate.setMonth(thresholdDate.getMonth() + 6);
+  return currentDate.getTime() >= thresholdDate.getTime();
+}
+
+export function toLocalDateStr(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate()
+  ).padStart(2, '0')}`;
+}
+
+export function parseLocalDateStr(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
 }

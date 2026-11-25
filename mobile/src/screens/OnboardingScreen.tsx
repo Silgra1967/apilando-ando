@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   StatusBar,
   Image,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -22,6 +23,7 @@ import {
   Leaf,
   Moon,
   Check,
+  ArrowLeft,
 } from 'lucide-react-native';
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
@@ -35,7 +37,10 @@ export const OnboardingScreen: React.FC = () => {
   const [selectedColor, setSelectedColor] = useState<string>(THEME.palette[0].hex);
   const [anchorText, setAnchorText] = useState<string>('');
   const [reminderTime, setReminderTime] = useState<string>('20:00');
+  const [timeError, setTimeError] = useState<string | null>(null);
   const [revelationStep, setRevelationStep] = useState<number>(1);
+  const [isFinishing, setIsFinishing] = useState<boolean>(false);
+  const finishingRef = useRef<boolean>(false);
 
   const { createInitialHabit } = useHabitStore();
   const { colors } = useAppTheme();
@@ -63,20 +68,35 @@ export const OnboardingScreen: React.FC = () => {
     },
   ];
 
+  const normalizeTimeInput = (raw: string): string | null => {
+    const match = raw.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+    if (!match) return null;
+    return `${match[1].padStart(2, '0')}:${match[2]}`;
+  };
+
   const handleFinish = async () => {
-    const fallback = language === 'en' ? 'Walk 15 min' : 'Caminar 15 min';
-    const finalName = habitName.trim() || fallback;
-    await createInitialHabit(finalName, selectedColor, anchorText, reminderTime, userName);
+    if (finishingRef.current || isFinishing) return;
+    finishingRef.current = true;
+    setIsFinishing(true);
+    try {
+      const fallback = language === 'en' ? 'Walk 15 min' : 'Caminar 15 min';
+      const finalName = habitName.trim() || fallback;
+      const safeTime = normalizeTimeInput(reminderTime) || '20:00';
+      await createInitialHabit(finalName, selectedColor, anchorText, safeTime, userName);
+    } finally {
+      finishingRef.current = false;
+      setIsFinishing(false);
+    }
   };
 
   const adjustHour = (delta: number) => {
-    const parts = reminderTime.split(':');
-    const parsedHour = parseInt(parts[0], 10);
-    const parsedMin = parseInt(parts[1], 10);
-    const currentH = Number.isNaN(parsedHour) ? 20 : parsedHour;
-    const currentM = Number.isNaN(parsedMin) ? 0 : parsedMin;
+    const normalized = normalizeTimeInput(reminderTime) || '20:00';
+    const [hoursStr, minsStr] = normalized.split(':');
+    const currentH = parseInt(hoursStr, 10);
+    const currentM = parseInt(minsStr, 10);
     const nextH = (currentH + delta + 24) % 24;
     setReminderTime(`${String(nextH).padStart(2, '0')}:${String(currentM).padStart(2, '0')}`);
+    setTimeError(null);
   };
 
   const progressWidth =
@@ -84,13 +104,24 @@ export const OnboardingScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={styles.innerContent}>
           {/* BARRA DE PROGRESO PARA PASOS 2 A 4 */}
           {step >= 2 && step <= 4 && (
             <View style={styles.progressHeader}>
               <View style={styles.progressTopRow}>
                 <View style={styles.stepLabelRow}>
+                  <TouchableOpacity
+                    style={styles.backIconBtn}
+                    onPress={() => setStep(step - 1)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel={t.onboarding.backBtn}
+                  >
+                    <ArrowLeft size={16} color={colors.dark} />
+                  </TouchableOpacity>
                   <Sprout size={15} color={colors.coral} />
                   <Text style={styles.badgeStep}>
                     {formatText(t.onboarding.stepOf, { step: step - 1 })}
@@ -137,7 +168,9 @@ export const OnboardingScreen: React.FC = () => {
                     placeholderTextColor={colors.outline}
                     value={userName}
                     onChangeText={setUserName}
+                    maxLength={30}
                     returnKeyType="done"
+                    onSubmitEditing={() => setStep(2)}
                   />
                 </View>
               </View>
@@ -151,7 +184,7 @@ export const OnboardingScreen: React.FC = () => {
           {/* PASO 2: ELEGIR HÁBITO Y COLOR */}
           {step === 2 && (
             <View style={styles.contentBetween}>
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={styles.heading}>{t.onboarding.step2Title}</Text>
                 <Text style={styles.subheading}>{t.onboarding.step2Sub}</Text>
 
@@ -162,6 +195,7 @@ export const OnboardingScreen: React.FC = () => {
                     placeholderTextColor={colors.outline}
                     value={habitName}
                     onChangeText={setHabitName}
+                    maxLength={60}
                   />
 
                   <View style={styles.chipRow}>
@@ -180,7 +214,7 @@ export const OnboardingScreen: React.FC = () => {
                     ))}
                   </View>
 
-                  <Text style={styles.sectionLabel}>Color identificatorio</Text>
+                  <Text style={styles.sectionLabel}>{t.onboarding.step2ColorLabel}</Text>
                   <View style={styles.colorRow}>
                     {THEME.palette.map((c) => (
                       <TouchableOpacity
@@ -202,7 +236,7 @@ export const OnboardingScreen: React.FC = () => {
               </ScrollView>
 
               <TouchableOpacity style={styles.primaryButton} onPress={() => setStep(3)}>
-                <Text style={styles.primaryButtonText}>Este es</Text>
+                <Text style={styles.primaryButtonText}>{t.onboarding.step2ConfirmBtn}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -210,29 +244,22 @@ export const OnboardingScreen: React.FC = () => {
           {/* PASO 3: ANCLA */}
           {step === 3 && (
             <View style={styles.contentBetween}>
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.heading}>¿A qué momento del día lo podés enganchar?</Text>
-                <Text style={styles.subheading}>
-                  Los hábitos nuevos se instalan mejor cuando los anclás a algo que ya hacés en
-                  automático.
-                </Text>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <Text style={styles.heading}>{t.onboarding.step3Title}</Text>
+                <Text style={styles.subheading}>{t.onboarding.step3Sub}</Text>
 
                 <View style={styles.cardBox}>
                   <TextInput
                     style={styles.input}
-                    placeholder="Ej. Después del café, antes de dormir..."
+                    placeholder={t.onboarding.step3Placeholder}
                     placeholderTextColor={colors.outline}
                     value={anchorText}
                     onChangeText={setAnchorText}
+                    maxLength={80}
                   />
 
                   <View style={styles.chipRow}>
-                    {[
-                      'Después del desayuno',
-                      'Con el mate',
-                      'Antes de dormir',
-                      'Al volver del trabajo',
-                    ].map((a) => (
+                    {t.onboarding.step3Suggestions.map((a) => (
                       <TouchableOpacity
                         key={a}
                         style={[styles.chip, anchorText === a && styles.chipActive]}
@@ -249,7 +276,7 @@ export const OnboardingScreen: React.FC = () => {
 
               <View>
                 <TouchableOpacity style={styles.primaryButton} onPress={() => setStep(4)}>
-                  <Text style={styles.primaryButtonText}>Perfecto</Text>
+                  <Text style={styles.primaryButtonText}>{t.onboarding.step3ConfirmBtn}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.textButton}
@@ -258,7 +285,7 @@ export const OnboardingScreen: React.FC = () => {
                     setStep(4);
                   }}
                 >
-                  <Text style={styles.textButtonText}>Prefiero no anclar por ahora</Text>
+                  <Text style={styles.textButtonText}>{t.onboarding.step3SkipAnchor}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -268,15 +295,13 @@ export const OnboardingScreen: React.FC = () => {
           {step === 4 && (
             <View style={styles.contentBetween}>
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.heading}>¿A qué hora te viene mejor?</Text>
-                <Text style={styles.subheading}>
-                  Te mandamos un recordatorio sutil. Cero spam, cero alertas agresivas.
-                </Text>
+                <Text style={styles.heading}>{t.onboarding.step4Title}</Text>
+                <Text style={styles.subheading}>{t.onboarding.step4Sub}</Text>
 
                 <View style={styles.cardBox}>
                   {/* Caja Hora Elegida */}
                   <View style={styles.timeDisplayCard}>
-                    <Text style={styles.timeOverline}>HORA ELEGIDA</Text>
+                    <Text style={styles.timeOverline}>{t.onboarding.step4ChosenTimeLabel}</Text>
                     <View style={styles.timeAdjustRow}>
                       <TouchableOpacity
                         style={styles.timeStepBtn}
@@ -288,7 +313,21 @@ export const OnboardingScreen: React.FC = () => {
                       <TextInput
                         style={styles.timeInput}
                         value={reminderTime}
-                        onChangeText={setReminderTime}
+                        onChangeText={(val) => {
+                          setReminderTime(val);
+                          if (timeError && normalizeTimeInput(val)) {
+                            setTimeError(null);
+                          }
+                        }}
+                        onBlur={() => {
+                          const normalized = normalizeTimeInput(reminderTime);
+                          if (normalized) {
+                            setReminderTime(normalized);
+                            setTimeError(null);
+                          } else {
+                            setTimeError(t.onboarding.invalidTimeError);
+                          }
+                        }}
                         maxLength={5}
                         keyboardType="numbers-and-punctuation"
                       />
@@ -301,13 +340,17 @@ export const OnboardingScreen: React.FC = () => {
                       </TouchableOpacity>
                     </View>
 
+                    {timeError && <Text style={styles.timeErrorText}>{timeError}</Text>}
+
                     <View style={styles.reminderStatusPill}>
                       <Bell size={13} color={colors.coral} />
-                      <Text style={styles.reminderStatusText}>Recordatorio diario activado</Text>
+                      <Text style={styles.reminderStatusText}>
+                        {t.onboarding.step4ReminderActive}
+                      </Text>
                     </View>
                   </View>
 
-                  <Text style={styles.presetsLabel}>O elegí según tu momento ancla:</Text>
+                  <Text style={styles.presetsLabel}>{t.onboarding.step4PresetsLabel}</Text>
                   <View style={styles.presetsList}>
                     {TIME_PRESETS.map((preset) => {
                       const selected = reminderTime === preset.time;
@@ -315,7 +358,10 @@ export const OnboardingScreen: React.FC = () => {
                         <TouchableOpacity
                           key={preset.time}
                           style={[styles.presetRow, selected && styles.presetRowSelected]}
-                          onPress={() => setReminderTime(preset.time)}
+                          onPress={() => {
+                            setReminderTime(preset.time);
+                            setTimeError(null);
+                          }}
                         >
                           <View style={styles.presetLeft}>
                             <View style={[styles.presetIconCircle, { backgroundColor: preset.bg }]}>
@@ -344,8 +390,20 @@ export const OnboardingScreen: React.FC = () => {
                 </View>
               </ScrollView>
 
-              <TouchableOpacity style={styles.primaryButton} onPress={() => setStep(5)}>
-                <Text style={styles.primaryButtonText}>Listo</Text>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => {
+                  const normalized = normalizeTimeInput(reminderTime);
+                  if (!normalized) {
+                    setTimeError(t.onboarding.invalidTimeError);
+                    return;
+                  }
+                  setReminderTime(normalized);
+                  setTimeError(null);
+                  setStep(5);
+                }}
+              >
+                <Text style={styles.primaryButtonText}>{t.onboarding.step4DoneBtn}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -361,16 +419,16 @@ export const OnboardingScreen: React.FC = () => {
                     </View>
                     <View style={[styles.ruleBadgePill, { backgroundColor: colors.lima }]}>
                       <Text style={[styles.ruleBadgeText, { color: colors.onLima }]}>
-                        REGLA 1 DE 3 · 🌱 FOCO PLENO
+                        {t.onboarding.rule1Badge}
                       </Text>
                     </View>
-                    <Text style={styles.headingCenter}>Un hábito a la vez</Text>
+                    <Text style={styles.headingCenter}>{t.onboarding.rule1Title}</Text>
                     <Text style={styles.paragraphCenter}>
-                      Esta app solo te deja tener{' '}
-                      <Text style={styles.boldText}>un hábito activo a la vez</Text>. No es un
-                      límite: es para asegurar que{' '}
-                      <Text style={styles.boldText}>{habitName || 'tu hábito'}</Text> realmente
-                      eche raíces en tu vida.
+                      {t.onboarding.rule1Text}{' '}
+                      <Text style={styles.boldText}>
+                        {habitName.trim() || t.onboarding.rule1Fallback}
+                      </Text>
+                      {t.onboarding.rule1TextEnd}
                     </Text>
                   </View>
                 )}
@@ -383,15 +441,15 @@ export const OnboardingScreen: React.FC = () => {
                       <Shield size={28} color={colors.coral} />
                     </View>
                     <View style={[styles.ruleBadgePill, { backgroundColor: colors.coral }]}>
-                      <Text style={[styles.ruleBadgeText, { color: colors.white }]}>
-                        REGLA 2 DE 3 · 🛡️ 2 DISPONIBLES
+                      <Text style={[styles.ruleBadgeText, { color: colors.onCoral }]}>
+                        {t.onboarding.rule2Badge}
                       </Text>
                     </View>
-                    <Text style={styles.headingCenter}>Tus escudos de protección</Text>
+                    <Text style={styles.headingCenter}>{t.onboarding.rule2Title}</Text>
                     <Text style={styles.paragraphCenter}>
-                      Empezás con <Text style={styles.boldText}>2 escudos</Text>. Si un día no
-                      podés, la racha no se cae: al día siguiente decidís conscientemente si usar
-                      tu escudo. La constancia importa más que la perfección.
+                      {t.onboarding.rule2Text1}{' '}
+                      <Text style={styles.boldText}>{t.onboarding.rule2Bold}</Text>
+                      {t.onboarding.rule2Text2}
                     </Text>
                   </View>
                 )}
@@ -403,44 +461,61 @@ export const OnboardingScreen: React.FC = () => {
                     </View>
                     <View style={[styles.ruleBadgePill, { backgroundColor: colors.aqua }]}>
                       <Text style={[styles.ruleBadgeText, { color: colors.onAqua }]}>
-                        REGLA 3 DE 3 · 🌿 MANTENIMIENTO
+                        {t.onboarding.rule3Badge}
                       </Text>
                     </View>
-                    <Text style={styles.headingCenter}>La meta de 21 días</Text>
+                    <Text style={styles.headingCenter}>{t.onboarding.rule3Title}</Text>
                     <Text style={styles.paragraphCenter}>
-                      Cuando llegues a los <Text style={styles.boldText}>21 días cumplidos</Text>,
-                      recién ahí abriremos la puerta para sumar el siguiente hábito. Hasta
-                      entonces, este es tu único foco.
+                      {t.onboarding.rule3Text1}{' '}
+                      <Text style={styles.boldText}>{t.onboarding.rule3Bold}</Text>
+                      {t.onboarding.rule3Text2}
                     </Text>
                   </View>
                 )}
               </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.primaryButton,
-                  revelationStep === 3 && { backgroundColor: colors.coral },
-                ]}
-                onPress={() => {
-                  if (revelationStep < 3) {
-                    setRevelationStep(revelationStep + 1);
-                  } else {
-                    handleFinish();
-                  }
-                }}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {revelationStep === 1
-                    ? 'Entendido'
-                    : revelationStep === 2
-                    ? 'Siguiente'
-                    : '¡Entendido, empecemos! 🌱'}
-                </Text>
-              </TouchableOpacity>
+              <View>
+                <TouchableOpacity
+                  style={[
+                    styles.primaryButton,
+                    revelationStep === 3 && { backgroundColor: colors.coral },
+                    isFinishing && { opacity: 0.6 },
+                  ]}
+                  disabled={isFinishing}
+                  onPress={() => {
+                    if (revelationStep < 3) {
+                      setRevelationStep(revelationStep + 1);
+                    } else {
+                      handleFinish();
+                    }
+                  }}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {revelationStep === 1
+                      ? t.onboarding.understoodBtn
+                      : revelationStep === 2
+                      ? t.onboarding.nextBtn
+                      : t.onboarding.letsStartBtn}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.textButton}
+                  disabled={isFinishing}
+                  onPress={() => {
+                    if (revelationStep > 1) {
+                      setRevelationStep(revelationStep - 1);
+                    } else {
+                      setStep(4);
+                    }
+                  }}
+                >
+                  <Text style={styles.textButtonText}>{t.onboarding.backBtn}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -477,6 +552,15 @@ const createStyles = (colors: ThemeColors) =>
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  backIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 2,
   },
   badgeStep: {
     fontFamily: THEME.fonts.semibold,
@@ -731,6 +815,13 @@ const createStyles = (colors: ThemeColors) =>
     color: colors.coral,
     paddingVertical: 4,
   },
+  timeErrorText: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 12,
+    color: colors.coralDark,
+    textAlign: 'center',
+    marginTop: 4,
+  },
   reminderStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -854,7 +945,7 @@ const createStyles = (colors: ThemeColors) =>
   },
   primaryButtonText: {
     fontFamily: THEME.fonts.semibold,
-    color: colors.white,
+    color: colors.onCoral,
     fontSize: 16,
   },
   textButton: {

@@ -43,6 +43,8 @@ export const MilestoneCelebrationModal: React.FC<MilestoneCelebrationModalProps>
   const localizedStickerName =
     stickerKey && t.stickers.items[stickerKey]
       ? t.stickers.items[stickerKey].name
+      : data.streak === 90
+      ? t.modals.milestone90Name
       : data.stickerName;
 
   return (
@@ -199,12 +201,12 @@ const createStyles = (colors: ThemeColors) =>
   shieldReplenishTitle: {
     fontFamily: THEME.fonts.semibold,
     fontSize: 13,
-    color: '#7D6608',
+    color: colors.shieldGold,
   },
   shieldReplenishSub: {
     fontFamily: THEME.fonts.regular,
     fontSize: 11,
-    color: '#7D6608',
+    color: colors.dark,
     marginTop: 2,
     lineHeight: 15,
   },
@@ -238,7 +240,7 @@ const createStyles = (colors: ThemeColors) =>
   },
   continueBtnText: {
     fontFamily: THEME.fonts.semibold,
-    color: colors.white,
+    color: colors.onCoral,
     fontSize: 14,
   },
 });

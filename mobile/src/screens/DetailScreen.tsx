@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -31,11 +31,13 @@ import {
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
-import { Habit, isEligibleForAnchorGraduation } from '../types/habit';
+import { Habit, isEligibleForAnchorGraduation, parseLocalDateStr } from '../types/habit';
+import { findMilestoneSticker } from '../types/stickers';
 import { useHabitStore } from '../store/habitStore';
 
 interface DetailScreenProps {
   habit: Habit;
+  currentDateKey?: string;
   onBack: () => void;
   onOpenAddHabit?: () => void;
   onOpenStickers?: () => void;
@@ -43,6 +45,7 @@ interface DetailScreenProps {
 
 export const DetailScreen: React.FC<DetailScreenProps> = ({
   habit,
+  currentDateKey,
   onBack,
   onOpenAddHabit,
   onOpenStickers,
@@ -56,17 +59,26 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
     archiveHabit,
   } = useHabitStore();
 
-  const now = new Date();
+  const now = currentDateKey ? parseLocalDateStr(currentDateKey) : new Date();
   const [monthOffset, setMonthOffset] = useState<number>(0);
+  const [confirmingAction, setConfirmingAction] = useState<'graduate' | 'archive' | null>(null);
   const { colors, shadows } = useAppTheme();
   const { t, language, locale } = useTranslation();
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
+
+  useEffect(() => {
+    setConfirmingAction(null);
+  }, [habit.id]);
 
   const viewedDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const viewedYear = viewedDate.getFullYear();
   const viewedMonth = viewedDate.getMonth();
   const isCurrentMonth =
     viewedYear === now.getFullYear() && viewedMonth === now.getMonth();
+  const createdDate = new Date(habit.createdAt);
+  const isCreationMonth =
+    viewedYear < createdDate.getFullYear() ||
+    (viewedYear === createdDate.getFullYear() && viewedMonth <= createdDate.getMonth());
   const currentDayNum = now.getDate();
 
   const viewedMonthName = viewedDate.toLocaleDateString(locale, {
@@ -104,8 +116,27 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   const daysRemainingTo21 = Math.max(0, 21 - habit.currentStreak);
   const progressPct = Math.min(100, Math.round((habit.currentStreak / 21) * 100));
   const readyForAnchorGraduation = isEligibleForAnchorGraduation(habit, now);
-  const latestSticker =
+  const monthsRemainingToAnchor = useMemo(() => {
+    if (!habit.promotedToMaintenanceAt) return 6;
+    const promoted = new Date(habit.promotedToMaintenanceAt);
+    const monthsPassed =
+      (now.getFullYear() - promoted.getFullYear()) * 12 +
+      (now.getMonth() - promoted.getMonth()) -
+      (now.getDate() < promoted.getDate() ? 1 : 0);
+    return Math.max(1, 6 - Math.max(0, monthsPassed));
+  }, [habit.promotedToMaintenanceAt, now.getFullYear(), now.getMonth(), now.getDate()]);
+  const latestRawSticker =
     habit.stickersUnlocked[habit.stickersUnlocked.length - 1] || '🌱 Primer Paso';
+  const latestSticker = useMemo(() => {
+    if (latestRawSticker.includes('90 Días')) {
+      return `💎 ${t.modals.milestone90Name}`;
+    }
+    const matched = findMilestoneSticker(latestRawSticker);
+    if (!matched) return latestRawSticker;
+    const key = matched.id as keyof typeof t.stickers.items;
+    const localized = t.stickers.items[key]?.name || matched.name;
+    return `${matched.emoji} ${localized}`;
+  }, [latestRawSticker, t]);
 
   const statusLabel =
     habit.status === 'active'
@@ -117,6 +148,8 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
       : habit.status === 'paused'
       ? t.detail.statusPaused
       : t.detail.statusArchived;
+
+  const habitAccent = habit.color || colors.coral;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -136,7 +169,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                 habit.status === 'paused' && styles.statusBadgeNeutral,
               ]}
             >
-              <View style={styles.statusDot} />
+              <View style={[styles.statusDot, { backgroundColor: habitAccent }]} />
               <Text style={styles.statusBadgeText}>{statusLabel}</Text>
             </View>
           </View>
@@ -144,8 +177,8 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           {/* ENCABEZADO HERO DEL HÁBITO */}
           <View style={styles.heroCard}>
             <View style={styles.heroTopRow}>
-              <View style={styles.heroIconBox}>
-                <Sprout size={26} color={colors.coral} />
+              <View style={[styles.heroIconBox, { borderColor: habitAccent }]}>
+                <Sprout size={26} color={habitAccent} />
               </View>
               <View style={styles.heroTitleCol}>
                 <Text style={styles.habitTitle}>{habit.name}</Text>
@@ -163,12 +196,14 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           <View style={styles.metricsGrid}>
             <View style={styles.metricCard}>
               <View style={styles.metricHead}>
-                <Text style={styles.metricLabel}>RACHA</Text>
+                <Text style={styles.metricLabel}>{t.detail.streak}</Text>
                 <Flame size={16} color={colors.coral} />
               </View>
               <View style={styles.metricValueRow}>
                 <Text style={styles.metricValue}>{habit.currentStreak}</Text>
-                <Text style={styles.metricUnit}>{t.detail.days}</Text>
+                <Text style={styles.metricUnit}>
+                  {habit.currentStreak === 1 ? t.detail.daySingular : t.detail.days}
+                </Text>
               </View>
               <Text style={styles.metricSubCoral}>
                 {habit.currentStreak > 0 ? t.detail.constant : t.detail.starting}
@@ -182,7 +217,9 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
               </View>
               <View style={styles.metricValueRow}>
                 <Text style={styles.metricValue}>{habit.bestStreak}</Text>
-                <Text style={styles.metricUnit}>{t.detail.days}</Text>
+                <Text style={styles.metricUnit}>
+                  {habit.bestStreak === 1 ? t.detail.daySingular : t.detail.days}
+                </Text>
               </View>
               <Text style={styles.metricSubMuted}>{t.detail.bestMark}</Text>
             </View>
@@ -211,10 +248,14 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
               </View>
               <View style={styles.calendarNavRow}>
                 <TouchableOpacity
-                  style={styles.calendarNavBtn}
+                  style={[styles.calendarNavBtn, isCreationMonth && styles.calendarNavBtnDisabled]}
+                  disabled={isCreationMonth}
                   onPress={() => setMonthOffset((prev) => prev - 1)}
                 >
-                  <ChevronLeft size={18} color={colors.dark} />
+                  <ChevronLeft
+                    size={18}
+                    color={isCreationMonth ? colors.outline : colors.dark}
+                  />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.calendarNavBtn, isCurrentMonth && styles.calendarNavBtnDisabled]}
@@ -383,69 +424,123 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
             )}
 
             {habit.status === 'maintenance' && (
-              <TouchableOpacity
-                style={[styles.graduateBtn, readyForAnchorGraduation && styles.graduateBtnHighlighted]}
-                onPress={async () => {
-                  await graduateToAnchor(habit.id);
-                  onBack();
-                }}
-              >
-                <Text style={styles.graduateBtnText}>
-                  {readyForAnchorGraduation
-                    ? '🎉 ¡6 meses cumplidos! Graduar a Ancla 🌳'
-                    : '🌳 Graduar a Ancla Definitiva'}
-                </Text>
-                <Text style={styles.graduateBtnSub}>
-                  {readyForAnchorGraduation
-                    ? 'Ya es parte natural de vos. Podés graduarlo y dejar de tildarlo todos los días.'
-                    : 'Si ya es parte 100 % natural de tu vida, deja de requerir tildado diario.'}
-                </Text>
-              </TouchableOpacity>
+              readyForAnchorGraduation ? (
+                confirmingAction === 'graduate' ? (
+                  <View style={styles.confirmCard}>
+                    <Text style={styles.confirmCardText}>
+                      {formatText(t.detail.graduateConfirmText, { name: habit.name })}
+                    </Text>
+                    <View style={styles.confirmActionsRow}>
+                      <TouchableOpacity
+                        style={styles.confirmCancelBtn}
+                        onPress={() => setConfirmingAction(null)}
+                      >
+                        <Text style={styles.confirmCancelText}>{t.detail.cancelBtn}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.confirmPrimaryBtn}
+                        onPress={async () => {
+                          await graduateToAnchor(habit.id);
+                          setConfirmingAction(null);
+                          onBack();
+                        }}
+                      >
+                        <Text style={styles.confirmPrimaryText}>{t.detail.graduateConfirmBtn}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.graduateBtn, styles.graduateBtnHighlighted]}
+                    onPress={() => setConfirmingAction('graduate')}
+                  >
+                    <Text style={styles.graduateBtnText}>{t.detail.graduateReadyTitle}</Text>
+                    <Text style={styles.graduateBtnSub}>{t.detail.graduateReadySub}</Text>
+                  </TouchableOpacity>
+                )
+              ) : (
+                <View style={styles.graduateLockedCard}>
+                  <View style={styles.graduateLockedHeader}>
+                    <Lock size={15} color={colors.outline} />
+                    <Text style={styles.graduateLockedTitle}>{t.detail.pathToAnchor}</Text>
+                  </View>
+                  <Text style={styles.graduateLockedSub}>
+                    {formatText(t.detail.remainingToAnchor, { count: monthsRemainingToAnchor })}
+                  </Text>
+                </View>
+              )
             )}
 
-            <View style={styles.secondaryActionsRow}>
-              {habit.status === 'paused' ? (
-                <TouchableOpacity
-                  style={styles.actionPill}
-                  onPress={async () => {
-                    await resumeHabit(habit.id);
-                  }}
-                >
-                  <Play size={15} color={colors.aquaDark} />
-                  <Text style={styles.actionPillText}>Reanudar hábito</Text>
-                </TouchableOpacity>
-              ) : (
-                habit.status !== 'archived' && (
+            {habit.status === 'anchor' && (
+              <View style={styles.anchorGraduatedCard}>
+                <Text style={styles.anchorGraduatedText}>{t.detail.graduatedText}</Text>
+              </View>
+            )}
+
+            {confirmingAction === 'archive' ? (
+              <View style={styles.confirmCard}>
+                <Text style={styles.confirmCardText}>
+                  {formatText(t.detail.archiveConfirmText, { name: habit.name })}
+                </Text>
+                <View style={styles.confirmActionsRow}>
+                  <TouchableOpacity
+                    style={styles.confirmCancelBtn}
+                    onPress={() => setConfirmingAction(null)}
+                  >
+                    <Text style={styles.confirmCancelText}>{t.detail.cancelBtn}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.confirmDangerBtn}
+                    onPress={async () => {
+                      await archiveHabit(habit.id);
+                      setConfirmingAction(null);
+                      onBack();
+                    }}
+                  >
+                    <Text style={styles.confirmDangerText}>{t.detail.archiveConfirmBtn}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.secondaryActionsRow}>
+                {habit.status === 'paused' ? (
                   <TouchableOpacity
                     style={styles.actionPill}
                     onPress={async () => {
-                      await pauseHabit(habit.id);
+                      await resumeHabit(habit.id);
                     }}
                   >
-                    <PauseCircle size={15} color={colors.aquaDark} />
-                    <Text style={styles.actionPillText}>Pausar sin culpa</Text>
+                    <Play size={15} color={colors.aquaDark} />
+                    <Text style={styles.actionPillText}>{t.detail.resumeAction}</Text>
                   </TouchableOpacity>
-                )
-              )}
+                ) : (
+                  habit.status !== 'archived' && (
+                    <TouchableOpacity
+                      style={styles.actionPill}
+                      onPress={async () => {
+                        await pauseHabit(habit.id);
+                      }}
+                    >
+                      <PauseCircle size={15} color={colors.aquaDark} />
+                      <Text style={styles.actionPillText}>{t.detail.pauseAction}</Text>
+                    </TouchableOpacity>
+                  )
+                )}
 
-              {habit.status !== 'archived' && (
-                <TouchableOpacity
-                  style={styles.actionPill}
-                  onPress={async () => {
-                    await archiveHabit(habit.id);
-                    onBack();
-                  }}
-                >
-                  <Archive size={15} color={colors.coral} />
-                  <Text style={styles.actionPillText}>Archivar con paz</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+                {habit.status !== 'archived' && (
+                  <TouchableOpacity
+                    style={styles.actionPill}
+                    onPress={() => setConfirmingAction('archive')}
+                  >
+                    <Archive size={15} color={colors.coral} />
+                    <Text style={styles.actionPillText}>{t.detail.archiveAction}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
 
-          <Text style={styles.gentleQuote}>
-            "Las raíces no se apresuran; crecen en el silencio de cada pequeño intento."
-          </Text>
+          <Text style={styles.gentleQuote}>{t.detail.gentleQuote}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -894,6 +989,97 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
     color: colors.muted,
     textAlign: 'center',
     marginTop: 4,
+  },
+  graduateLockedCard: {
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: 18,
+    padding: 14,
+    gap: 4,
+  },
+  graduateLockedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  graduateLockedTitle: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 13,
+    color: colors.muted,
+  },
+  graduateLockedSub: {
+    fontFamily: THEME.fonts.regular,
+    fontSize: 12,
+    color: colors.outline,
+    lineHeight: 17,
+  },
+  anchorGraduatedCard: {
+    backgroundColor: colors.aquaLight,
+    borderWidth: 1,
+    borderColor: colors.aqua,
+    borderRadius: 18,
+    padding: 14,
+  },
+  anchorGraduatedText: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 13,
+    color: colors.aquaDark,
+    lineHeight: 19,
+  },
+  confirmCard: {
+    backgroundColor: colors.surfaceLow,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 14,
+    gap: 10,
+  },
+  confirmCardText: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 12,
+    color: colors.dark,
+    lineHeight: 18,
+  },
+  confirmActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: THEME.radius.full,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  confirmCancelText: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 12,
+    color: colors.dark,
+  },
+  confirmPrimaryBtn: {
+    flex: 1,
+    backgroundColor: colors.lima,
+    borderRadius: THEME.radius.full,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  confirmPrimaryText: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 12,
+    color: colors.onLima,
+  },
+  confirmDangerBtn: {
+    flex: 1,
+    backgroundColor: colors.coral,
+    borderRadius: THEME.radius.full,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  confirmDangerText: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 12,
+    color: colors.onCoral,
   },
   secondaryActionsRow: {
     flexDirection: 'row',
