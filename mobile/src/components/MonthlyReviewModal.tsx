@@ -11,7 +11,13 @@ import {
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
-import { Habit, DailyLog, parseLocalDateStr } from '../types/habit';
+import {
+  Habit,
+  DailyLog,
+  isReadyForMaintenancePromotion,
+  parseLocalDateStr,
+  toLocalDateStr,
+} from '../types/habit';
 
 interface MonthlyReviewContentProps {
   habits: Habit[];
@@ -68,7 +74,13 @@ export const MonthlyReviewContent: React.FC<MonthlyReviewContentProps> = ({
   const maintenanceCount = habits.filter((h) => h.status === 'maintenance').length;
   const anchorCount = habits.filter((h) => h.status === 'anchor').length;
 
-  const canPromote = activeHabit && activeHabit.currentStreak >= 21;
+  const todayStr = currentDateKey || toLocalDateStr(now);
+  const canPromote = activeHabit
+    ? isReadyForMaintenancePromotion(activeHabit, logs, todayStr)
+    : false;
+  const completed21Today = Boolean(
+    activeHabit && activeHabit.currentStreak >= 21 && !canPromote
+  );
 
   const handleContinue = () => {
     if (onContinueFocus) {
@@ -150,12 +162,17 @@ export const MonthlyReviewContent: React.FC<MonthlyReviewContentProps> = ({
               </View>
             ) : (
               <View style={styles.decisionPedagogy}>
-                <Text style={styles.pedagogyTitle}>{t.monthly.pedagogyTitle}</Text>
+                <Text style={styles.pedagogyTitle}>
+                  {completed21Today ? t.monthly.completed21WaitTitle : t.monthly.pedagogyTitle}
+                </Text>
                 <Text style={styles.pedagogyText}>
-                  {formatText(t.monthly.pedagogyText, {
-                    count: activeHabit.currentStreak,
-                    name: activeHabit.name,
-                  })}
+                  {formatText(
+                    completed21Today ? t.monthly.completed21WaitText : t.monthly.pedagogyText,
+                    {
+                      count: activeHabit.currentStreak,
+                      name: activeHabit.name,
+                    }
+                  )}
                 </Text>
                 <TouchableOpacity style={styles.pedagogyBtn} onPress={handleContinue}>
                   <Text style={styles.pedagogyBtnText}>{t.monthly.continueBtn}</Text>

@@ -41,6 +41,9 @@ export const TRANSLATIONS = {
       daysToConsolidate: 'Día {count} de 21 para consolidar',
       readyConsolidateTitle: '¡Hábito consolidado! Listo para el siguiente',
       readyConsolidateSub: 'Tocá acá para pasar a Mantenimiento y habilitar tu próximo hábito.',
+      completed21WaitTitle: '🎉 ¡Cerraste tus 21 días!',
+      completed21WaitSub:
+        'Disfrutá este logro hoy; mañana (día 22) se habilita tu próximo hábito.',
       doneQuestion: '¿Hecho?',
       doneCelebration: '¡Lo lograste!',
       addHabitTitle: 'Sumar nuevo hábito en construcción',
@@ -75,6 +78,9 @@ export const TRANSLATIONS = {
       pathToMaintenance: 'Camino a Mantenimiento',
       daysOf21: '{count} de 21 días ({pct}%)',
       readyToMaintenance: '¡Lograste los 21 días! Ya podés consolidarlo a Mantenimiento.',
+      waitTomorrowToMaintenance:
+        '¡Completaste tu día 21 hoy! Disfrutá el logro; mañana (día 22) se habilita consolidarlo.',
+      waitTomorrowLockLabel: 'Disponible mañana (día 22)',
       remainingToMaintenance: 'Faltan solo {count} días para habilitar la consolidación a 🌿 Mantenimiento.',
       promoteMaintenanceBtn: 'Promover a Mantenimiento y sumar otro ✨',
       pathToAnchor: 'Camino a Hábito Ancla (6 meses)',
@@ -222,6 +228,9 @@ export const TRANSLATIONS = {
       pedagogyText:
         'Llevás {count} días con "{name}". El cerebro necesita al menos 21 días para que una conducta pase a modo automático.\n\nAgregar otro hábito ahora dividiría tu energía. El mes que viene, cuando este ya sea natural, abriremos la puerta para el siguiente.',
       continueBtn: 'Seguir consolidando con calma 🌱',
+      completed21WaitTitle: '🎉 ¡21 días cumplidos hoy!',
+      completed21WaitText:
+        'Celebrá haber completado los 21 días de "{name}". Mañana (en tu día 22) vas a poder consolidarlo y sumar el siguiente hábito sin superponer días.',
       allConsolidatedTag: '🌿 RUTINA EN CURSO',
       allConsolidatedTitle: 'Todos tus hábitos están consolidados',
       allConsolidatedSub: 'Podés sumar un nuevo hábito activo desde Hoy en cualquier momento.',
@@ -374,6 +383,9 @@ export const TRANSLATIONS = {
       daysToConsolidate: 'Day {count} of 21 to consolidate',
       readyConsolidateTitle: 'Habit consolidated! Ready for the next one',
       readyConsolidateSub: 'Tap here to move it to Maintenance and unlock your next habit.',
+      completed21WaitTitle: '🎉 21 days completed!',
+      completed21WaitSub:
+        'Celebrate this milestone today; tomorrow (day 22) your next habit unlocks.',
       doneQuestion: 'Done?',
       doneCelebration: 'You did it!',
       addHabitTitle: 'Add a new active habit',
@@ -408,6 +420,9 @@ export const TRANSLATIONS = {
       pathToMaintenance: 'Path to Maintenance',
       daysOf21: '{count} of 21 days ({pct}%)',
       readyToMaintenance: 'You reached 21 days! You can now promote it to Maintenance.',
+      waitTomorrowToMaintenance:
+        'You completed day 21 today! Celebrate this win; promotion unlocks tomorrow (day 22).',
+      waitTomorrowLockLabel: 'Unlocks tomorrow (day 22)',
       remainingToMaintenance: 'Only {count} days left to unlock 🌿 Maintenance.',
       promoteMaintenanceBtn: 'Promote to Maintenance & add another ✨',
       pathToAnchor: 'Path to Anchor Habit (6 months)',
@@ -555,6 +570,9 @@ export const TRANSLATIONS = {
       pedagogyText:
         'You have {count} days with "{name}". Your brain needs at least 21 days for a behavior to feel automatic.\n\nAdding another habit now would split your energy. Next month, once this feels natural, we will open the door for the next one.',
       continueBtn: 'Keep consolidating calmly 🌱',
+      completed21WaitTitle: '🎉 21 days completed today!',
+      completed21WaitText:
+        'Celebrate completing 21 days with "{name}". Tomorrow (day 22) you can move it to Maintenance and add your next habit without overlapping days.',
       allConsolidatedTag: '🌿 ROUTINE ON TRACK',
       allConsolidatedTitle: 'All your habits are consolidated',
       allConsolidatedSub: 'You can add a new active habit from Today at any time.',

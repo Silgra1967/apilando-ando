@@ -28,7 +28,11 @@ import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
 import { useHabitStore, toLocalDateStr } from '../store/habitStore';
-import { Habit, isEligibleForAnchorGraduation } from '../types/habit';
+import {
+  Habit,
+  isEligibleForAnchorGraduation,
+  isReadyForMaintenancePromotion,
+} from '../types/habit';
 import { triggerSuccessHaptic, triggerLightHaptic } from '../services/hapticService';
 import { MilestoneCelebrationData } from '../components/MilestoneCelebrationModal';
 import { ConfettiBurst } from '../components/ConfettiBurst';
@@ -422,8 +426,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     </View>
                   </View>
 
-                  {/* Invitación a consolidar si ya llegó a 21 días */}
-                  {activeHabit.currentStreak >= 21 && (
+                  {/* Invitación a consolidar recién en día 22; en día 21 se celebra hoy */}
+                  {isReadyForMaintenancePromotion(activeHabit, logs, todayStr) ? (
                     <TouchableOpacity
                       style={styles.readyConsolidateBanner}
                       onPress={() => onPromoteHabit(activeHabit)}
@@ -435,6 +439,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                         {t.dashboard.readyConsolidateSub}
                       </Text>
                     </TouchableOpacity>
+                  ) : (
+                    activeHabit.currentStreak >= 21 && (
+                      <View style={styles.readyConsolidateBanner}>
+                        <Text style={styles.readyConsolidateTitle}>
+                          {t.dashboard.completed21WaitTitle}
+                        </Text>
+                        <Text style={styles.readyConsolidateSub}>
+                          {t.dashboard.completed21WaitSub}
+                        </Text>
+                      </View>
+                    )
                   )}
 
                   {/* Botón principal de tildado */}

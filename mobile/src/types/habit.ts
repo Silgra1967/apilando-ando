@@ -76,3 +76,20 @@ export function parseLocalDateStr(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
+
+/**
+ * Habilita promover a Mantenimiento y sumar un nuevo hábito recién en el día 22
+ * (cuando ya cumplió los 21 días y no completó el día 21 hoy mismo).
+ */
+export function isReadyForMaintenancePromotion(
+  habit: Habit,
+  logs: Record<string, DailyLog>,
+  todayStr: string = toLocalDateStr(new Date())
+): boolean {
+  if (habit.status !== 'active' || habit.currentStreak < 21) return false;
+  const completedToday = logs[`${habit.id}_${todayStr}`]?.status === 'completed';
+  if (habit.currentStreak === 21 && completedToday) {
+    return false;
+  }
+  return true;
+}

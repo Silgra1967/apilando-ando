@@ -31,7 +31,13 @@ import {
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
-import { Habit, isEligibleForAnchorGraduation, parseLocalDateStr } from '../types/habit';
+import {
+  Habit,
+  isEligibleForAnchorGraduation,
+  isReadyForMaintenancePromotion,
+  parseLocalDateStr,
+  toLocalDateStr,
+} from '../types/habit';
 import { findMilestoneSticker } from '../types/stickers';
 import { useHabitStore } from '../store/habitStore';
 
@@ -60,6 +66,8 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   } = useHabitStore();
 
   const now = currentDateKey ? parseLocalDateStr(currentDateKey) : new Date();
+  const todayStr = currentDateKey || toLocalDateStr(now);
+  const readyForMaintenance = isReadyForMaintenancePromotion(habit, logs, todayStr);
   const [monthOffset, setMonthOffset] = useState<number>(0);
   const [confirmingAction, setConfirmingAction] = useState<'graduate' | 'archive' | null>(null);
   const { colors, shadows } = useAppTheme();
@@ -399,10 +407,12 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                 <Text style={styles.lifecycleHint}>
                   {daysRemainingTo21 > 0
                     ? formatText(t.detail.remainingToMaintenance, { count: daysRemainingTo21 })
-                    : t.detail.readyToMaintenance}
+                    : readyForMaintenance
+                    ? t.detail.readyToMaintenance
+                    : t.detail.waitTomorrowToMaintenance}
                 </Text>
 
-                {habit.currentStreak >= 21 ? (
+                {readyForMaintenance ? (
                   <TouchableOpacity
                     style={styles.promoteBtn}
                     onPress={async () => {
@@ -416,7 +426,9 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                   <View style={styles.promoteBtnDisabled}>
                     <Lock size={16} color={colors.outline} />
                     <Text style={styles.promoteBtnDisabledText}>
-                      {t.detail.pathToMaintenance} ({daysRemainingTo21}d)
+                      {daysRemainingTo21 > 0
+                        ? `${t.detail.pathToMaintenance} (${daysRemainingTo21}d)`
+                        : t.detail.waitTomorrowLockLabel}
                     </Text>
                   </View>
                 )}

@@ -6,6 +6,7 @@ import {
   AppSettings,
   HabitStatus,
   isEligibleForAnchorGraduation,
+  isReadyForMaintenancePromotion,
   toLocalDateStr,
 } from '../types/habit';
 import { MilestoneCelebrationData } from '../components/MilestoneCelebrationModal';
@@ -470,9 +471,11 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
   },
 
   promoteToMaintenance: async (habitId) => {
-    const { habits } = get();
+    const { habits, logs } = get();
     const target = habits.find((h) => h.id === habitId);
-    if (!target || target.status !== 'active' || target.currentStreak < 21) return;
+    if (!target || !isReadyForMaintenancePromotion(target, logs, toLocalDateStr(new Date()))) {
+      return;
+    }
 
     const updatedHabits = habits.map((h) => {
       if (h.id === habitId) {
