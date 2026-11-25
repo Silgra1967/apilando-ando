@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, StatusBar, Platform } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet, StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { Sprout, Trophy, Calendar } from 'lucide-react-native';
 import {
@@ -109,11 +109,7 @@ function AppContent() {
   }, [isLoaded, settings.onboardingCompleted, settings.reminderTime, settings.notificationsEnabled]);
 
   if (!isLoaded) {
-    return (
-      <View style={styles.centerLoading}>
-        <ActivityIndicator size="large" color={colors.sage} />
-      </View>
-    );
+    return <BrandSplash colors={colors} />;
   }
 
   // 1. Si no completó el onboarding, mostrar Onboarding
@@ -376,6 +372,28 @@ function AppContent() {
   );
 }
 
+function BrandSplash({ colors, fontLoaded = true }: { colors: ThemeColors; fontLoaded?: boolean }) {
+  return (
+    <View style={[loadingStyles.centerLoading, { backgroundColor: colors.cream }]}>
+      <Image
+        source={require('./assets/logo.png')}
+        style={loadingStyles.logo}
+        resizeMode="contain"
+      />
+      <Text
+        style={[
+          loadingStyles.brandTitle,
+          { color: colors.dark },
+          fontLoaded && { fontFamily: THEME.fonts.bold },
+        ]}
+      >
+        Apilando <Text style={{ color: colors.coral }}>Ando</Text>
+      </Text>
+      <ActivityIndicator size="small" color={colors.coral} style={loadingStyles.spinner} />
+    </View>
+  );
+}
+
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
@@ -385,11 +403,7 @@ export default function App() {
   });
 
   if (!fontsLoaded && !fontError) {
-    return (
-      <View style={loadingStyles.centerLoading}>
-        <ActivityIndicator size="large" color={THEME.colors.coral} />
-      </View>
-    );
+    return <BrandSplash colors={THEME.colors} fontLoaded={false} />;
   }
 
   return (
@@ -405,6 +419,22 @@ const loadingStyles = StyleSheet.create({
     backgroundColor: THEME.colors.cream,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  logo: {
+    width: 96,
+    height: 96,
+    marginBottom: 14,
+  },
+  brandTitle: {
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: '700',
+    letterSpacing: -0.7,
+    textAlign: 'center',
+  },
+  spinner: {
+    marginTop: 20,
   },
 });
 

@@ -47,6 +47,40 @@
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>Necesitás habilitar JavaScript para usar Apilando Ando.</noscript>
     <!-- The root element for your Expo app. -->
-    <div id="root"></div>
+    <div id="root">
+      <div
+        style="
+          display: flex;
+          flex: 1;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          background-color: #F7FBF9;
+          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        "
+      >
+        <img
+          src="/icons/icon-192.png"
+          alt="Apilando Ando"
+          width="96"
+          height="96"
+          style="width: 96px; height: 96px; object-fit: contain; margin-bottom: 14px;"
+        />
+        <div
+          style="
+            font-size: 32px;
+            line-height: 38px;
+            font-weight: 700;
+            letter-spacing: -0.7px;
+            color: #121E1C;
+            text-align: center;
+          "
+        >
+          Apilando <span style="color: #E85B4A;">Ando</span>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
