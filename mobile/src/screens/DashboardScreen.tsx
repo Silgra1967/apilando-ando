@@ -28,6 +28,7 @@ import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
 import { useHabitStore, toLocalDateStr } from '../store/habitStore';
 import {
+  CONSOLIDATION_DAYS,
   Habit,
   isEligibleForAnchorGraduation,
   isReadyForMaintenancePromotion,
@@ -467,18 +468,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     </View>
                   </TouchableOpacity>
 
-                  {/* Barra hacia los 21 días */}
+                  {/* Barra hacia la meta de consolidación */}
                   <View style={styles.targetProgressBox}>
                     <View style={styles.progressRowText}>
                       <Text style={styles.progressSub}>
-                        {activeHabit.currentStreak >= 21
+                        {activeHabit.currentStreak >= CONSOLIDATION_DAYS
                           ? t.dashboard.completed21
                           : formatText(t.dashboard.daysToConsolidate, {
                               count: activeHabit.currentStreak,
                             })}
                       </Text>
                       <Text style={styles.progressPercent}>
-                        {Math.min(100, Math.round((activeHabit.currentStreak / 21) * 100))}%
+                        {Math.min(
+                          100,
+                          Math.round((activeHabit.currentStreak / CONSOLIDATION_DAYS) * 100)
+                        )}
+                        %
                       </Text>
                     </View>
                     <View style={styles.progressBarTrack}>
@@ -488,7 +493,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                           {
                             width: `${Math.min(
                               100,
-                              Math.round((activeHabit.currentStreak / 21) * 100)
+                              Math.round((activeHabit.currentStreak / CONSOLIDATION_DAYS) * 100)
                             )}%`,
                           },
                         ]}
@@ -496,7 +501,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     </View>
                   </View>
 
-                  {/* Invitación a consolidar recién en día 22; en día 21 se celebra hoy */}
+                  {/* Invitación a consolidar recién al día siguiente; hoy se celebra */}
                   {isReadyForMaintenancePromotion(activeHabit, logs, todayStr) ? (
                     <TouchableOpacity
                       style={styles.readyConsolidateBanner}
@@ -510,7 +515,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       </Text>
                     </TouchableOpacity>
                   ) : (
-                    activeHabit.currentStreak >= 21 && (
+                    activeHabit.currentStreak >= CONSOLIDATION_DAYS && (
                       <View style={styles.readyConsolidateBanner}>
                         <Text style={styles.readyConsolidateTitle}>
                           {t.dashboard.completed21WaitTitle}

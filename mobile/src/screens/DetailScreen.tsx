@@ -31,7 +31,9 @@ import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
 import {
+  CONSOLIDATION_DAYS,
   Habit,
+  getDaysRemainingToAnchor,
   isEligibleForAnchorGraduation,
   isReadyForMaintenancePromotion,
   parseLocalDateStr,
@@ -120,18 +122,13 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
     ...days.map((d) => ({ key: `day_${d.num}`, num: d.num, type: d.type })),
   ];
 
-  const daysRemainingTo21 = Math.max(0, 21 - habit.currentStreak);
-  const progressPct = Math.min(100, Math.round((habit.currentStreak / 21) * 100));
+  const daysRemainingTo21 = Math.max(0, CONSOLIDATION_DAYS - habit.currentStreak);
+  const progressPct = Math.min(100, Math.round((habit.currentStreak / CONSOLIDATION_DAYS) * 100));
   const readyForAnchorGraduation = isEligibleForAnchorGraduation(habit, now);
-  const monthsRemainingToAnchor = useMemo(() => {
-    if (!habit.promotedToMaintenanceAt) return 6;
-    const promoted = new Date(habit.promotedToMaintenanceAt);
-    const monthsPassed =
-      (now.getFullYear() - promoted.getFullYear()) * 12 +
-      (now.getMonth() - promoted.getMonth()) -
-      (now.getDate() < promoted.getDate() ? 1 : 0);
-    return Math.max(1, 6 - Math.max(0, monthsPassed));
-  }, [habit.promotedToMaintenanceAt, now.getFullYear(), now.getMonth(), now.getDate()]);
+  const monthsRemainingToAnchor = useMemo(
+    () => getDaysRemainingToAnchor(habit, now),
+    [habit.promotedToMaintenanceAt, now.getFullYear(), now.getMonth(), now.getDate()]
+  );
   const latestRawSticker =
     habit.stickersUnlocked[habit.stickersUnlocked.length - 1] || '🌱 Primer Paso';
   const latestSticker = useMemo(() => {

@@ -11,7 +11,7 @@ import { Shield, ArrowRight, Award, Check } from 'lucide-react-native';
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
-import { Habit } from '../types/habit';
+import { CONSOLIDATION_DAYS, Habit } from '../types/habit';
 
 interface ShieldModalProps {
   visible: boolean;
@@ -48,7 +48,7 @@ export const ShieldModal: React.FC<ShieldModalProps> = ({
   const isGrouped = !infoOnly && habits.length > 1;
   const singleHabit = habits[0];
   const remainingAfterUse = singleHabit ? Math.max(0, singleHabit.shieldsAvailable - 1) : 0;
-  const daysTo21 = singleHabit ? Math.max(0, 21 - singleHabit.currentStreak) : 0;
+  const daysTo21 = singleHabit ? Math.max(0, CONSOLIDATION_DAYS - singleHabit.currentStreak) : 0;
 
   const toggleHabit = (id: string) => {
     setSelectedIds((prev) =>

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  ANCHOR_GRADUATION_DAYS,
   Habit,
   DailyLog,
   AppSettings,
@@ -163,9 +164,10 @@ const STREAK_MILESTONES: ReadonlyArray<{
   emoji: string;
   stickerLabel: string;
 }> = [
-  { streak: 7, title: 'Semana Firme', emoji: '🔥', stickerLabel: '🔥 7 Días' },
-  { streak: 14, title: 'Ritmo Vivo', emoji: '⚡', stickerLabel: '⚡ 14 Días' },
-  { streak: 21, title: 'Hábito Consolidado', emoji: '🌿', stickerLabel: '🏆 Hábito 21 Días' },
+  { streak: 3, title: 'Primer Impulso', emoji: '🔥', stickerLabel: '🔥 7 Días' },
+  { streak: 5, title: 'Hábito Consolidado', emoji: '🌿', stickerLabel: '🏆 Hábito 21 Días' },
+  { streak: 10, title: 'Ritmo Vivo', emoji: '⚡', stickerLabel: '⚡ 14 Días' },
+  { streak: 15, title: 'Paso Firme', emoji: '🌙', stickerLabel: '🌙 Mes Imparable' },
   { streak: 30, title: 'Mes Imparable', emoji: '🌙', stickerLabel: '🌙 Mes Imparable' },
   { streak: 50, title: 'Mitad de Cien', emoji: '⭐', stickerLabel: '⭐ Mitad de Cien' },
   { streak: 90, title: 'Trimestre Sólido', emoji: '💎', stickerLabel: '💎 90 Días' },
@@ -809,17 +811,19 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
   simulateSixMonthsReady: async (habitId) => {
     const { habits } = get();
     const now = new Date();
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()).toISOString();
+    const graduationAgo = new Date(
+      now.getTime() - ANCHOR_GRADUATION_DAYS * 86400000
+    ).toISOString();
 
     const updated = habits.map((h) =>
       h.id === habitId
         ? {
             ...h,
             status: 'maintenance' as const,
-            promotedToMaintenanceAt: sixMonthsAgo,
-            currentStreak: Math.max(h.currentStreak, 180),
-            bestStreak: Math.max(h.bestStreak, 180),
-            totalCompletedDays: Math.max(h.totalCompletedDays, 180),
+            promotedToMaintenanceAt: graduationAgo,
+            currentStreak: Math.max(h.currentStreak, ANCHOR_GRADUATION_DAYS),
+            bestStreak: Math.max(h.bestStreak, ANCHOR_GRADUATION_DAYS),
+            totalCompletedDays: Math.max(h.totalCompletedDays, ANCHOR_GRADUATION_DAYS),
             shieldsAvailable: 3,
           }
         : h

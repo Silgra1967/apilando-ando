@@ -12,6 +12,7 @@ import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useTranslation, formatText } from '../i18n/translations';
 import {
+  CONSOLIDATION_DAYS,
   Habit,
   DailyLog,
   isReadyForMaintenancePromotion,
@@ -79,7 +80,7 @@ export const MonthlyReviewContent: React.FC<MonthlyReviewContentProps> = ({
     ? isReadyForMaintenancePromotion(activeHabit, logs, todayStr)
     : false;
   const completed21Today = Boolean(
-    activeHabit && activeHabit.currentStreak >= 21 && !canPromote
+    activeHabit && activeHabit.currentStreak >= CONSOLIDATION_DAYS && !canPromote
   );
 
   const handleContinue = () => {

@@ -53,17 +53,35 @@ export interface AppSettings {
 }
 
 /**
- * Determina si un hábito en mantenimiento ya cumplió 6 meses para graduarse a Ancla.
+ * Umbrales de ciclo de vida (configurados para prueba real: 5 días y 10 días).
+ * Para producción definitiva: CONSOLIDATION_DAYS = 21, ANCHOR_GRADUATION_DAYS = 180.
+ */
+export const CONSOLIDATION_DAYS = 5;
+export const ANCHOR_GRADUATION_DAYS = 10;
+
+/**
+ * Determina si un hábito en Perseverando ya cumplió el tiempo requerido para graduarse a Ancla.
  */
 export function isEligibleForAnchorGraduation(
   habit: Habit,
   currentDate: Date = new Date()
 ): boolean {
   if (habit.status !== 'maintenance' || !habit.promotedToMaintenanceAt) return false;
-  const promotedDate = new Date(habit.promotedToMaintenanceAt);
-  const thresholdDate = new Date(promotedDate);
-  thresholdDate.setMonth(thresholdDate.getMonth() + 6);
-  return currentDate.getTime() >= thresholdDate.getTime();
+  const promotedDay = parseLocalDateStr(toLocalDateStr(new Date(habit.promotedToMaintenanceAt)));
+  const currentDay = parseLocalDateStr(toLocalDateStr(currentDate));
+  const diffDays = Math.floor((currentDay.getTime() - promotedDay.getTime()) / 86400000);
+  return diffDays >= ANCHOR_GRADUATION_DAYS;
+}
+
+export function getDaysRemainingToAnchor(
+  habit: Habit,
+  currentDate: Date = new Date()
+): number {
+  if (!habit.promotedToMaintenanceAt) return ANCHOR_GRADUATION_DAYS;
+  const promotedDay = parseLocalDateStr(toLocalDateStr(new Date(habit.promotedToMaintenanceAt)));
+  const currentDay = parseLocalDateStr(toLocalDateStr(currentDate));
+  const diffDays = Math.max(0, Math.floor((currentDay.getTime() - promotedDay.getTime()) / 86400000));
+  return Math.max(1, ANCHOR_GRADUATION_DAYS - diffDays);
 }
 
 export function toLocalDateStr(date: Date): string {
@@ -78,17 +96,17 @@ export function parseLocalDateStr(dateStr: string): Date {
 }
 
 /**
- * Habilita promover a Mantenimiento y sumar un nuevo hábito recién en el día 22
- * (cuando ya cumplió los 21 días y no completó el día 21 hoy mismo).
+ * Habilita promover a Perseverando y sumar un nuevo hábito recién al día siguiente
+ * de cumplir CONSOLIDATION_DAYS (para no superponer días).
  */
 export function isReadyForMaintenancePromotion(
   habit: Habit,
   logs: Record<string, DailyLog>,
   todayStr: string = toLocalDateStr(new Date())
 ): boolean {
-  if (habit.status !== 'active' || habit.currentStreak < 21) return false;
+  if (habit.status !== 'active' || habit.currentStreak < CONSOLIDATION_DAYS) return false;
   const completedToday = logs[`${habit.id}_${todayStr}`]?.status === 'completed';
-  if (habit.currentStreak === 21 && completedToday) {
+  if (habit.currentStreak === CONSOLIDATION_DAYS && completedToday) {
     return false;
   }
   return true;
