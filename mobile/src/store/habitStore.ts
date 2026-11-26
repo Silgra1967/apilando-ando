@@ -948,7 +948,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       }
 
       // Hábito activo (últimos 12 días)
-      if (d > todayNum - 12 && d < todayNum) {
+      if (d >= todayNum - 12 && d < todayNum) {
         simulatedLogs[`${activeHabit.id}_${dateStr}`] = {
           id: `${activeHabit.id}_${dateStr}`,
           habitId: activeHabit.id,

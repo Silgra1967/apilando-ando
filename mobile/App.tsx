@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   StatusBar,
   Platform,
   AppState,
+  Animated,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { Sprout, Trophy, Calendar } from 'lucide-react-native';
@@ -40,7 +41,8 @@ import {
 import { Habit } from './src/types/habit';
 import { THEME, ThemeColors } from './src/theme/colors';
 import { useAppTheme } from './src/theme/useAppTheme';
-import { useTranslation } from './src/i18n/translations';
+import { useTranslation, formatText } from './src/i18n/translations';
+import { triggerLightHaptic, triggerSuccessHaptic } from './src/services/hapticService';
 import {
   scheduleDailyReminder,
   cancelDailyReminders,
@@ -83,10 +85,54 @@ function AppContent() {
   const [milestoneCelebration, setMilestoneCelebration] = useState<MilestoneCelebrationData | null>(null);
   const [pendingShieldDate, setPendingShieldDate] = useState<string | null>(null);
   const [pendingShieldHabits, setPendingShieldHabits] = useState<Habit[]>([]);
+  const [shieldFeedback, setShieldFeedback] = useState<{
+    message: string;
+    tone: 'shield' | 'calm';
+  } | null>(null);
+  const shieldToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shieldToastOpacity = useRef(new Animated.Value(0)).current;
   const [currentDateKey, setCurrentDateKey] = useState<string>(() => toLocalDateStr(new Date()));
   const { colors, isDark } = useAppTheme();
   const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const hideShieldFeedback = () => {
+    if (shieldToastTimerRef.current) {
+      clearTimeout(shieldToastTimerRef.current);
+      shieldToastTimerRef.current = null;
+    }
+    Animated.timing(shieldToastOpacity, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      setShieldFeedback(null);
+    });
+  };
+
+  const showShieldFeedback = (message: string, tone: 'shield' | 'calm') => {
+    if (shieldToastTimerRef.current) {
+      clearTimeout(shieldToastTimerRef.current);
+    }
+    setShieldFeedback({ message, tone });
+    shieldToastOpacity.setValue(0);
+    Animated.timing(shieldToastOpacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+    shieldToastTimerRef.current = setTimeout(() => {
+      hideShieldFeedback();
+    }, 3400);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (shieldToastTimerRef.current) {
+        clearTimeout(shieldToastTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadFromStorage();
@@ -289,6 +335,26 @@ function AppContent() {
                 />
               </SafeAreaView>
             )}
+
+            {shieldFeedback && (
+              <Animated.View
+                pointerEvents="box-none"
+                style={[styles.shieldToastWrap, { opacity: shieldToastOpacity }]}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={hideShieldFeedback}
+                  style={[
+                    styles.shieldToast,
+                    shieldFeedback.tone === 'shield'
+                      ? styles.shieldToastShield
+                      : styles.shieldToastCalm,
+                  ]}
+                >
+                  <Text style={styles.shieldToastText}>{shieldFeedback.message}</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
           </View>
 
           <SafeAreaView style={styles.bottomBarSafe} edges={['bottom']}>
@@ -437,6 +503,11 @@ function AppContent() {
           setPendingShieldDate(null);
           setShieldModalVisible(false);
           cancelShieldAlerts();
+          triggerSuccessHaptic();
+          showShieldFeedback(
+            formatText(t.modals.shieldAppliedSingle, { name: habit.name }),
+            'shield'
+          );
         }}
         onRejectSingle={async (habit) => {
           if (!pendingShieldDate) return;
@@ -445,6 +516,8 @@ function AppContent() {
           setPendingShieldDate(null);
           setShieldModalVisible(false);
           cancelShieldAlerts();
+          triggerLightHaptic();
+          showShieldFeedback(t.modals.shieldSkippedSingle, 'calm');
         }}
         onConfirmGrouped={async (protectedIds, resetIds) => {
           if (!pendingShieldDate) return;
@@ -453,6 +526,17 @@ function AppContent() {
           setPendingShieldDate(null);
           setShieldModalVisible(false);
           cancelShieldAlerts();
+          if (protectedIds.length > 0) {
+            triggerSuccessHaptic();
+            const message =
+              protectedIds.length === 1
+                ? t.modals.shieldAppliedMultiOne
+                : formatText(t.modals.shieldAppliedMulti, { count: protectedIds.length });
+            showShieldFeedback(message, 'shield');
+          } else {
+            triggerLightHaptic();
+            showShieldFeedback(t.modals.shieldSkippedMulti, 'calm');
+          }
         }}
         onClose={() => {
           setShieldModalVisible(false);
@@ -604,5 +688,41 @@ const createStyles = (colors: ThemeColors) =>
     tabLabelActive: {
       fontFamily: THEME.fonts.semibold,
       color: colors.coral,
+    },
+    shieldToastWrap: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      bottom: 14,
+      alignItems: 'center',
+      zIndex: 30,
+    },
+    shieldToast: {
+      width: '100%',
+      maxWidth: 420,
+      borderRadius: THEME.radius.lg,
+      borderWidth: 1.5,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      elevation: 5,
+    },
+    shieldToastShield: {
+      backgroundColor: colors.shieldGoldLight,
+      borderColor: colors.shieldGold,
+    },
+    shieldToastCalm: {
+      backgroundColor: colors.aquaLight,
+      borderColor: colors.aquaDark,
+    },
+    shieldToastText: {
+      fontFamily: THEME.fonts.semibold,
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.dark,
+      textAlign: 'center',
     },
   });

@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  ArrowLeft,
   ArrowRight,
   CornerDownRight,
   Flame,
@@ -165,11 +164,6 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
         <View style={styles.innerContent}>
           {/* SUB-BARRA DE NAVEGACIÓN & BADGE */}
           <View style={styles.topNav}>
-            <TouchableOpacity style={styles.backPill} onPress={onBack}>
-              <ArrowLeft size={16} color={colors.dark} />
-              <Text style={styles.backPillText}>{t.detail.backToToday}</Text>
-            </TouchableOpacity>
-
             <View
               style={[
                 styles.statusBadge,
@@ -180,6 +174,15 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
               <View style={[styles.statusDot, { backgroundColor: habitAccent }]} />
               <Text style={styles.statusBadgeText}>{statusLabel}</Text>
             </View>
+
+            <TouchableOpacity
+              onPress={onBack}
+              style={styles.closeBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel={t.detail.backToToday}
+            >
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
           </View>
 
           {/* ENCABEZADO HERO DEL HÁBITO */}
@@ -583,19 +586,20 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
     alignItems: 'center',
     gap: 8,
   },
-  backPill: {
-    flexDirection: 'row',
+  closeBtn: {
+    width: 34,
+    height: 34,
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.surfaceContainer,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    justifyContent: 'center',
+    backgroundColor: colors.white,
     borderRadius: THEME.radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  backPillText: {
+  closeBtnText: {
     fontFamily: THEME.fonts.medium,
-    fontSize: 12,
-    color: colors.dark,
+    fontSize: 14,
+    color: colors.muted,
   },
   statusBadge: {
     flexDirection: 'row',

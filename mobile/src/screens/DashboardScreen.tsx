@@ -22,7 +22,6 @@ import {
   Flame,
   Sparkles,
   ChevronRight,
-  Leaf,
 } from 'lucide-react-native';
 import { THEME, ThemeColors } from '../theme/colors';
 import { useAppTheme } from '../theme/useAppTheme';
@@ -66,6 +65,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const styles = useMemo(() => createStyles(colors, shadows), [colors, shadows]);
   const [helpTopic, setHelpTopic] = useState<'anchor' | 'construction' | null>(null);
   const [confettiKey, setConfettiKey] = useState(0);
+  const [groupModal, setGroupModal] = useState<'anchor' | 'maintenance' | null>(null);
 
   const helpContent =
     helpTopic === 'anchor'
@@ -134,8 +134,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const totalDone =
     (activeHabit && isCompletedToday(activeHabit.id) ? 1 : 0) +
     maintenanceHabits.filter((m) => isCompletedToday(m.id)).length;
+  const maintenanceDoneCount = maintenanceHabits.filter((m) => isCompletedToday(m.id)).length;
+  const hasAnchorSection = Boolean(activeHabit?.anchorText) || anchorHabits.length > 0;
+  const visibleAnchorHabits =
+    anchorHabits.length > 2 ? [anchorHabits[anchorHabits.length - 1]] : anchorHabits;
+  const visibleMaintenanceHabits =
+    maintenanceHabits.length > 2
+      ? [maintenanceHabits[maintenanceHabits.length - 1]]
+      : maintenanceHabits;
   const stackItemCount =
-    (activeHabit?.anchorText ? 1 : 0) + anchorHabits.length + maintenanceHabits.length + 1;
+    (hasAnchorSection ? 1 : 0) + (maintenanceHabits.length > 0 ? 1 : 0) + 1;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -241,123 +249,182 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           <View style={styles.stackContainer}>
             {stackItemCount > 1 && <View style={styles.verticalRail} />}
 
-            {/* 1. ANCLA INICIAL */}
-            {activeHabit?.anchorText && (
+            {/* 1. ANCLA (ANCLA INICIAL + HÁBITOS GRADUADOS EN UNA SOLA TARJETA) */}
+            {hasAnchorSection && (
               <View style={styles.stackRow}>
                 <View style={styles.nodeAnchor}>
                   <Anchor size={18} color={colors.aquaDark} />
                 </View>
                 <View style={styles.anchorCard}>
                   <View style={styles.anchorHeader}>
-                    <View style={styles.anchorPill}>
-                      <Text style={styles.anchorPillText}>{t.dashboard.anchorPill}</Text>
+                    <View style={styles.anchorHeaderLeft}>
+                      <View style={styles.anchorPill}>
+                        <Text style={styles.anchorPillText}>{t.dashboard.anchorPill}</Text>
+                      </View>
+                      {anchorHabits.length > 0 && (
+                        <Text style={styles.integratedText}>{t.dashboard.integrated}</Text>
+                      )}
                     </View>
-                    <TouchableOpacity
-                      style={styles.anchorHelpBtn}
-                      onPress={() => setHelpTopic('anchor')}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityLabel={t.dashboard.anchorHelpAccessibility}
-                    >
-                      <HelpCircle size={18} color={colors.muted} />
-                    </TouchableOpacity>
+                    <View style={styles.anchorHeaderRight}>
+                      {anchorHabits.length > 2 && (
+                        <TouchableOpacity
+                          style={styles.groupDetailBtn}
+                          onPress={() => setGroupModal('anchor')}
+                        >
+                          <Text style={styles.groupDetailBtnText}>
+                            {formatText(t.dashboard.seeAllCount, { count: anchorHabits.length })}
+                          </Text>
+                          <ChevronRight size={13} color={colors.aquaDark} />
+                        </TouchableOpacity>
+                      )}
+                      {activeHabit?.anchorText && (
+                        <TouchableOpacity
+                          style={styles.anchorHelpBtn}
+                          onPress={() => setHelpTopic('anchor')}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityLabel={t.dashboard.anchorHelpAccessibility}
+                        >
+                          <HelpCircle size={18} color={colors.muted} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                  <Text style={styles.anchorTitle}>{activeHabit.anchorText}</Text>
+
+                  {activeHabit?.anchorText && (
+                    <Text style={styles.anchorTitle}>{activeHabit.anchorText}</Text>
+                  )}
+
+                  {visibleAnchorHabits.map((a, idx) => (
+                    <TouchableOpacity
+                      key={a.id}
+                      style={[
+                        styles.groupedHabitRow,
+                        (Boolean(activeHabit?.anchorText) || idx > 0) && styles.groupedHabitRowBorder,
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={() => onOpenDetail(a)}
+                    >
+                      <View style={styles.groupedHabitInfo}>
+                        <View style={styles.habitTitleRow}>
+                          <View
+                            style={[
+                              styles.habitColorDot,
+                              { backgroundColor: a.color || colors.aquaDark },
+                            ]}
+                          />
+                          <Text style={styles.habitTitle} numberOfLines={2}>
+                            {a.name}
+                          </Text>
+                        </View>
+                        <View style={styles.metaInline}>
+                          <Sparkles size={13} color={colors.aquaDark} />
+                          <Text style={styles.graduatedStreak}>
+                            {formatText(t.dashboard.consolidatedStreak, { count: a.currentStreak })}
+                          </Text>
+                        </View>
+                      </View>
+                      <ChevronRight size={15} color={colors.muted} />
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
             )}
 
-            {/* 2. HÁBITOS GRADUADOS (6 MESES) */}
-            {anchorHabits.map((a) => (
-              <View key={a.id} style={styles.stackRow}>
-                <View style={styles.nodeGraduated}>
-                  <Trees size={17} color={colors.aquaDark} />
+            {/* 2. PERSEVERANDO (TODOS EN UNA SOLA TARJETA) */}
+            {maintenanceHabits.length > 0 && (
+              <View style={styles.stackRow}>
+                <View style={styles.nodeMaintenance}>
+                  <Trees size={17} color={colors.onAqua} />
                 </View>
-                <TouchableOpacity
-                  style={styles.graduatedCard}
-                  activeOpacity={0.85}
-                  onPress={() => onOpenDetail(a)}
-                >
+                <View style={styles.maintenanceGroupCard}>
                   <View style={styles.cardHeader}>
-                    <View style={styles.graduatedPill}>
-                      <Text style={styles.graduatedPillText}>{t.dashboard.graduatedPill}</Text>
+                    <View style={styles.maintenancePill}>
+                      <Text style={styles.maintenancePillText}>{t.dashboard.maintenancePill}</Text>
                     </View>
-                    <Text style={styles.integratedText}>{t.dashboard.integrated}</Text>
+                    <View style={styles.anchorHeaderRight}>
+                      {maintenanceHabits.length > 1 && (
+                        <Text style={styles.maintenanceSummaryCount}>
+                          {formatText(t.dashboard.maintenanceTodayCount, {
+                            done: maintenanceDoneCount,
+                            total: maintenanceHabits.length,
+                          })}
+                        </Text>
+                      )}
+                      {maintenanceHabits.length > 2 && (
+                        <TouchableOpacity
+                          style={styles.groupDetailBtn}
+                          onPress={() => setGroupModal('maintenance')}
+                        >
+                          <Text style={styles.groupDetailBtnText}>
+                            {formatText(t.dashboard.seeAllCount, {
+                              count: maintenanceHabits.length,
+                            })}
+                          </Text>
+                          <ChevronRight size={13} color={colors.aquaDark} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                  <View style={styles.habitTitleRow}>
-                    <View
-                      style={[
-                        styles.habitColorDot,
-                        { backgroundColor: a.color || colors.aquaDark },
-                      ]}
-                    />
-                    <Text style={styles.habitTitle}>{a.name}</Text>
-                  </View>
-                  <View style={styles.metaInline}>
-                    <Sparkles size={13} color={colors.aquaDark} />
-                    <Text style={styles.graduatedStreak}>
-                      {formatText(t.dashboard.consolidatedStreak, { count: a.currentStreak })}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            ))}
 
-            {/* 3. HÁBITOS EN MANTENIMIENTO */}
-            {maintenanceHabits.map((m) => {
-              const done = isCompletedToday(m.id);
-              const readyForAnchor = isEligibleForAnchorGraduation(m, now);
-              return (
-                <View key={m.id} style={styles.stackRow}>
-                  <View style={styles.nodeMaintenance}>
-                    <Leaf size={17} color={colors.onAqua} />
-                  </View>
-                  <View style={styles.maintenanceCard}>
-                    <TouchableOpacity
-                      style={styles.maintenanceInfo}
-                      activeOpacity={0.8}
-                      onPress={() => onOpenDetail(m)}
-                    >
-                      <View style={styles.maintenancePillRow}>
-                        <View style={styles.maintenancePill}>
-                          <Text style={styles.maintenancePillText}>{t.dashboard.maintenancePill}</Text>
-                        </View>
-                        {readyForAnchor && (
-                          <View style={styles.anchorReadyPill}>
-                            <Text style={styles.anchorReadyPillText}>{t.dashboard.graduate6m}</Text>
+                  {visibleMaintenanceHabits.map((m, idx) => {
+                    const done = isCompletedToday(m.id);
+                    const readyForAnchor = isEligibleForAnchorGraduation(m, now);
+                    return (
+                      <View
+                        key={m.id}
+                        style={[
+                          styles.maintenanceRow,
+                          idx > 0 && styles.groupedHabitRowBorder,
+                        ]}
+                      >
+                        <TouchableOpacity
+                          style={styles.maintenanceInfo}
+                          activeOpacity={0.8}
+                          onPress={() => onOpenDetail(m)}
+                        >
+                          {readyForAnchor && (
+                            <View style={styles.anchorReadyPillWrap}>
+                              <View style={styles.anchorReadyPill}>
+                                <Text style={styles.anchorReadyPillText}>
+                                  {t.dashboard.graduate6m}
+                                </Text>
+                              </View>
+                            </View>
+                          )}
+                          <View style={styles.habitTitleRow}>
+                            <View
+                              style={[
+                                styles.habitColorDot,
+                                { backgroundColor: m.color || colors.aqua },
+                              ]}
+                            />
+                            <Text style={styles.habitTitle} numberOfLines={2}>
+                              {m.name}
+                            </Text>
                           </View>
-                        )}
-                      </View>
-                      <View style={styles.habitTitleRow}>
-                        <View
-                          style={[
-                            styles.habitColorDot,
-                            { backgroundColor: m.color || colors.aqua },
-                          ]}
-                        />
-                        <Text style={styles.habitTitle} numberOfLines={2}>
-                          {m.name}
-                        </Text>
-                      </View>
-                      <View style={styles.metaInline}>
-                        <Flame size={13} color={colors.coral} />
-                        <Text style={styles.streakFlame}>
-                          {formatText(t.dashboard.continuousDays, { count: m.currentStreak })}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
+                          <View style={styles.metaInline}>
+                            <Flame size={13} color={colors.coral} />
+                            <Text style={styles.streakFlame}>
+                              {formatText(t.dashboard.continuousDays, { count: m.currentStreak })}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.checkboxCircle, done && styles.checkboxCircleDone]}
-                      onPress={() => handleToggleHabit(m.id, done, false)}
-                    >
-                      {done && <Check size={19} color={colors.onCoral} strokeWidth={2.8} />}
-                    </TouchableOpacity>
-                  </View>
+                        <TouchableOpacity
+                          style={[styles.checkboxCircle, done && styles.checkboxCircleDone]}
+                          onPress={() => handleToggleHabit(m.id, done, false)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          {done && <Check size={14} color={colors.cream} strokeWidth={2.6} />}
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
                 </View>
-              );
-            })}
+              </View>
+            )}
 
-            {/* 4. TARJETA PROTAGÓNICA: HÁBITO ACTIVO */}
+            {/* 3. TARJETA PROTAGÓNICA: HÁBITO ACTIVO (ACCIONANDO) */}
             {activeHabit && (
               <View style={styles.stackRow}>
                 <View style={styles.nodeActive}>
@@ -561,6 +628,105 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             )}
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* MODAL PARA VER TODOS LOS HÁBITOS ANCLA O PERSEVERANDO CUANDO HAY MUCHOS */}
+      <Modal
+        visible={groupModal !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setGroupModal(null)}
+      >
+        <View style={styles.groupModalOverlay}>
+          <View style={styles.groupModalSheet}>
+            <View style={styles.groupModalHeader}>
+              <Text style={styles.groupModalTitle}>
+                {groupModal === 'anchor'
+                  ? formatText(t.dashboard.anchorModalTitle, { count: anchorHabits.length })
+                  : formatText(t.dashboard.maintenanceModalTitle, {
+                      count: maintenanceHabits.length,
+                    })}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setGroupModal(null)}
+                style={styles.groupModalCloseBtn}
+              >
+                <Text style={styles.groupModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.groupModalList}>
+              {groupModal === 'anchor' &&
+                anchorHabits.map((a) => (
+                  <TouchableOpacity
+                    key={a.id}
+                    style={styles.groupModalItem}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setGroupModal(null);
+                      onOpenDetail(a);
+                    }}
+                  >
+                    <View style={styles.groupedHabitInfo}>
+                      <View style={styles.habitTitleRow}>
+                        <View
+                          style={[
+                            styles.habitColorDot,
+                            { backgroundColor: a.color || colors.aquaDark },
+                          ]}
+                        />
+                        <Text style={styles.habitTitle}>{a.name}</Text>
+                      </View>
+                      <Text style={styles.graduatedStreak}>
+                        {formatText(t.dashboard.consolidatedStreak, { count: a.currentStreak })}
+                      </Text>
+                    </View>
+                    <ChevronRight size={16} color={colors.muted} />
+                  </TouchableOpacity>
+                ))}
+
+              {groupModal === 'maintenance' &&
+                maintenanceHabits.map((m) => {
+                  const done = isCompletedToday(m.id);
+                  return (
+                    <View key={m.id} style={styles.groupModalItem}>
+                      <TouchableOpacity
+                        style={styles.maintenanceInfo}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setGroupModal(null);
+                          onOpenDetail(m);
+                        }}
+                      >
+                        <View style={styles.habitTitleRow}>
+                          <View
+                            style={[
+                              styles.habitColorDot,
+                              { backgroundColor: m.color || colors.aqua },
+                            ]}
+                          />
+                          <Text style={styles.habitTitle}>{m.name}</Text>
+                        </View>
+                        <View style={styles.metaInline}>
+                          <Flame size={13} color={colors.coral} />
+                          <Text style={styles.streakFlame}>
+                            {formatText(t.dashboard.continuousDays, { count: m.currentStreak })}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.checkboxCircle, done && styles.checkboxCircleDone]}
+                        onPress={() => handleToggleHabit(m.id, done, false)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        {done && <Check size={14} color={colors.cream} strokeWidth={2.6} />}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1005,9 +1171,9 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
     color: colors.coral,
   },
   checkboxCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: colors.aqua,
     backgroundColor: colors.aquaLight,
@@ -1017,6 +1183,126 @@ const createStyles = (colors: ThemeColors, shadows: ReturnType<typeof useAppThem
   checkboxCircleDone: {
     backgroundColor: colors.aquaDark,
     borderColor: colors.aquaDark,
+  },
+  maintenanceGroupCard: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 14,
+    gap: 10,
+    ...shadows.card,
+  },
+  maintenanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  anchorHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  anchorHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  groupDetailBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: colors.surfaceContainer,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: THEME.radius.full,
+  },
+  groupDetailBtnText: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 11,
+    color: colors.aquaDark,
+  },
+  groupedHabitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  groupedHabitRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 10,
+  },
+  groupedHabitInfo: {
+    flex: 1,
+  },
+  anchorReadyPillWrap: {
+    marginBottom: 4,
+  },
+  maintenanceSummaryCount: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 11,
+    color: colors.aquaDark,
+  },
+  groupModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(18, 30, 28, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  groupModalSheet: {
+    width: '100%',
+    maxWidth: 430,
+    alignSelf: 'center',
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 28,
+    maxHeight: '75%',
+  },
+  groupModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  groupModalTitle: {
+    fontFamily: THEME.fonts.semibold,
+    fontSize: 17,
+    color: colors.dark,
+  },
+  groupModalCloseBtn: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceLow,
+    borderRadius: THEME.radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  groupModalCloseText: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 14,
+    color: colors.muted,
+  },
+  groupModalList: {
+    gap: 10,
+    paddingBottom: 10,
+  },
+  groupModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    backgroundColor: colors.surfaceLow,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   activeCard: {
     flex: 1,
