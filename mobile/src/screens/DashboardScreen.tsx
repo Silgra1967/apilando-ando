@@ -66,6 +66,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [helpTopic, setHelpTopic] = useState<'anchor' | 'construction' | null>(null);
   const [confettiKey, setConfettiKey] = useState(0);
   const [groupModal, setGroupModal] = useState<'anchor' | 'maintenance' | null>(null);
+  const [quoteIndex, setQuoteIndex] = useState<number>(() =>
+    Math.floor(Math.random() * t.dashboard.closingQuotes.length)
+  );
 
   const helpContent =
     helpTopic === 'anchor'
@@ -567,17 +570,29 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             )}
           </View>
 
-          {/* MENSAJE DE CIERRE */}
-          <View style={styles.closingBanner}>
+          {/* MENSAJE DE CIERRE (FRASES MOTIVACIONALES AL AZAR) */}
+          <TouchableOpacity
+            style={styles.closingBanner}
+            activeOpacity={0.85}
+            onPress={() => {
+              const total = t.dashboard.closingQuotes.length;
+              if (total <= 1) return;
+              setQuoteIndex((prev) => {
+                let next = Math.floor(Math.random() * total);
+                if (next === prev % total) next = (prev + 1) % total;
+                return next;
+              });
+            }}
+          >
             <View style={styles.closingIconCircle}>
               <Sparkles size={16} color={colors.limaDark} />
             </View>
             <Text style={styles.closingBannerText}>
               {totalCheckable > 0 && totalDone === totalCheckable
                 ? t.dashboard.closingDone
-                : t.dashboard.closingPending}
+                : t.dashboard.closingQuotes[quoteIndex % t.dashboard.closingQuotes.length]}
             </Text>
-          </View>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
